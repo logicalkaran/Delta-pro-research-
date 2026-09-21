@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+
+# Runtime state
+data/runtime_state.json
+data/paper_trades.json
+data/*.tmp
+
+# Logs
+logs/
+*.log
+
+# Local test artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Termux / editor artifacts
+*.swp
+*.swo
+*~
+
+# Test artifacts
+data/test_artifacts/
