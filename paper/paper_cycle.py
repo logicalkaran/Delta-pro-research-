@@ -116,6 +116,39 @@ def main():
 
     validator = SignalValidator()
 
+    # Explicitly distinguish:
+    #   - no bullish crossover
+    #   - already processed crossover
+    #   - new executable crossover
+
+    if not latest.bullish_cross:
+
+        print()
+        print("Signal status : NO_BULLISH_CROSS")
+        print("Signal ID     : NOT_CREATED")
+        print("Risk status   : NOT_EVALUATED")
+        print("Paper order   : NOT_SUBMITTED")
+        print("REAL EXCHANGE ORDER: NO")
+        print("LIVE TRADING: OFF")
+        print("PAPER CYCLE: PASS")
+        return
+
+    signal_id = validator.make_signal_id(
+        latest.month
+    )
+
+    if validator.is_processed(signal_id):
+
+        print()
+        print("Signal status : ALREADY_PROCESSED")
+        print("Signal ID     :", signal_id)
+        print("Risk status   : NOT_EVALUATED")
+        print("Paper order   : NOT_SUBMITTED")
+        print("REAL EXCHANGE ORDER: NO")
+        print("LIVE TRADING: OFF")
+        print("PAPER CYCLE: PASS")
+        return
+
     validated = validator.validate(
         signal_month=latest.month,
         fisher=latest.fisher,
@@ -124,13 +157,10 @@ def main():
     )
 
     if validated is None:
-
-        print()
-        print("No new executable signal.")
-
-        print()
-        print("Paper cycle: PASS")
-        return
+        raise RuntimeError(
+            "Signal validation returned None after "
+            "crossover and duplicate checks passed."
+        )
 
     print()
     print("Validated signal:")
