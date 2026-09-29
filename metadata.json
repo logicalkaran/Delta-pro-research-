@@ -1,0 +1,6 @@
+{
+  "name": "DeltaPro: Crypto Terminal & Algo Trading",
+  "description": "Android trading terminal for Delta Exchange BTC and ETH markets featuring real-time interactive charts, personalized watchlists, automated price alert notifications, market analysis dashboard, and algo trading research powered by Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
