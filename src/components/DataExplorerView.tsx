@@ -72,7 +72,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({
           <div>
             <h2 className="font-bold text-sm text-white font-sans">Raw Market Data Ingestion & Explorer</h2>
             <p className="text-[11px] text-slate-400 font-sans">
-              Inspect raw trade events, depth updates, exchange timestamps, and sequence IDs
+              Research workspace uses a generated synthetic benchmark until you import exchange-captured JSONL/CSV data.
             </p>
           </div>
         </div>
@@ -103,10 +103,10 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({
           <button
             onClick={onResetSyntheticData}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-sans text-xs transition-all"
-            title="Reload standard 240-minute BTCUSDT benchmark"
+            title="Regenerate the synthetic 240-minute BTCUSDT research benchmark"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset Feed</span>
+            <span>Reset Synthetic Benchmark</span>
           </button>
         </div>
       </div>

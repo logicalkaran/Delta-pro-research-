@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FlaskConical,
   Play,
@@ -41,6 +41,10 @@ export const ResearchLabView: React.FC<ResearchLabViewProps> = ({
   const [filterRegime, setFilterRegime] = useState<MarketRegimeType | 'all'>('all');
   const [trainSplitPercent, setTrainSplitPercent] = useState<number>(70);
   const [experimentName, setExperimentName] = useState<string>('Aggressive Buy Delta > 2.0 BTC (5m Forward Return)');
+  const [history, setHistory] = useState<ResearchExperimentResult[]>(() => {
+    try { return JSON.parse(localStorage.getItem('deltapro_research_experiments') || '[]'); } catch { return []; }
+  });
+  useEffect(() => { try { localStorage.setItem('deltapro_research_experiments', JSON.stringify(history.slice(0, 30))); } catch {} }, [history]);
 
   const handleRunExperiment = () => {
     const config: ResearchExperimentConfig = {
@@ -58,6 +62,7 @@ export const ResearchLabView: React.FC<ResearchLabViewProps> = ({
     };
 
     const res = runResearchExperiment(bars, config);
+    setHistory(prev => [res, ...prev].slice(0, 30));
     onSaveExperimentResult(res);
   };
 
@@ -76,7 +81,7 @@ export const ResearchLabView: React.FC<ResearchLabViewProps> = ({
               Quantitative Hypothesis Testing & Predictive Lab
             </h2>
             <p className="text-[11px] text-slate-400 font-sans">
-              Test whether order flow features have statistically meaningful forward-return edge without lookahead bias
+              Exploratory chronological train/test research on the selected dataset; default microstructure benchmark is synthetic
             </p>
           </div>
         </div>
@@ -401,11 +406,16 @@ export const ResearchLabView: React.FC<ResearchLabViewProps> = ({
           <div className="p-3 bg-[#080c14] rounded-xl border border-slate-800 text-[11px] text-slate-400 font-sans flex items-center gap-2">
             <Info className="w-4 h-4 text-cyan-400 shrink-0" />
             <span>
-              <strong>Scientific Notice:</strong> Statistical correlation does not establish causality. All forward-return evaluations use chronological out-of-sample partitions without overlapping lookahead labels.
+              <strong>Research limitation:</strong> The split is chronological, but adjacent forward-return labels overlap and observations are not independent. Reported p-values are exploratory and may overstate confidence; validate with purged/embargoed walk-forward tests, costs and unseen sessions before considering any feature for production.
             </span>
           </div>
         </div>
       )}
+      <div className="rounded-xl border border-slate-800 bg-[#0d121f] p-3 space-y-2">
+        <div className="flex justify-between items-center"><h3 className="text-xs font-bold text-white">Saved experiment history (local device)</h3><span className="text-[10px] text-slate-500">{history.length} / 30</span></div>
+        {history.length === 0 ? <p className="text-[11px] text-slate-500">Run a hypothesis test to save its configuration and metrics in this browser's local storage.</p> : <div className="overflow-x-auto"><table className="w-full text-[11px]"><thead><tr className="text-slate-500 text-left"><th className="py-1 pr-3">Experiment</th><th className="pr-3">Dataset</th><th className="pr-3">OOS N</th><th className="pr-3">OOS mean (bps)</th><th>Verdict</th></tr></thead><tbody>{history.map(item => <tr key={item.config.experimentId} className="border-t border-slate-800 text-slate-300"><td className="py-2 pr-3">{item.config.name}</td><td className="pr-3">{item.config.datasetId}</td><td className="pr-3">{item.outOfSample.sampleCount}</td><td className="pr-3">{item.outOfSample.meanReturnBps}</td><td>{item.validationVerdict}</td></tr>)}</tbody></table></div>}
+        <button onClick={() => { if (window.confirm('Clear saved research experiment history from this device?')) setHistory([]); }} disabled={!history.length} className="text-[10px] text-rose-300 disabled:opacity-40">Clear local history</button>
+      </div>
     </div>
   );
 };

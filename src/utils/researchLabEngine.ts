@@ -32,28 +32,27 @@ export function runResearchExperiment(
     };
   }
 
-  // Horizon mapping to bar count (assuming 1-minute bars as primary base)
-  let horizonBars = 1;
-  switch (config.horizon) {
-    case '1s':
-    case '5s':
-    case '15s':
-    case '30s':
-    case '1m':
-      horizonBars = 1;
-      break;
-    case '5m':
-      horizonBars = 5;
-      break;
-    case '15m':
-      horizonBars = 15;
-      break;
-    case '1h':
-      horizonBars = 60;
-      break;
+  // DeltaBar research data is minute-based. Sub-minute horizons require tick/event data.
+  const emptyMetrics = computeDistributionMetrics([]);
+  if (['1s', '5s', '15s', '30s'].includes(config.horizon)) {
+    return {
+      config, inSample: emptyMetrics, outOfSample: emptyMetrics,
+      baselineZeroSignal: emptyMetrics, baselineMomentum: emptyMetrics,
+      baselineMonthlyFisher: emptyMetrics, validationVerdict: 'INSUFFICIENT_EVIDENCE',
+      verdictExplanation: `The selected ${config.horizon} horizon cannot be resolved from 1-minute DeltaBars. Import timestamped tick data and use an event-time research path.`,
+      executionTimestamp: Date.now(),
+    };
   }
-  // Ensure horizon doesn't exceed 25% of dataset
-  horizonBars = Math.max(1, Math.min(horizonBars, Math.floor(n * 0.25)));
+  const horizonBars = config.horizon === '1m' ? 1 : config.horizon === '5m' ? 5 : config.horizon === '15m' ? 15 : 60;
+  if (horizonBars > n * 0.25) {
+    return {
+      config, inSample: emptyMetrics, outOfSample: emptyMetrics,
+      baselineZeroSignal: emptyMetrics, baselineMomentum: emptyMetrics,
+      baselineMonthlyFisher: emptyMetrics, validationVerdict: 'INSUFFICIENT_EVIDENCE',
+      verdictExplanation: `The requested ${config.horizon} horizon consumes at least 25% of the available ${n}-bar dataset. Add more history; the engine will not silently shorten the requested horizon.`,
+      executionTimestamp: Date.now(),
+    };
+  }
 
   // Calculate forward return in basis points for each bar:
   // Forward return at t = (Close[t + horizon] - Close[t]) / Close[t] * 10,000 bps

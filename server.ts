@@ -51,181 +51,7 @@ const ai = new GoogleGenAI({
   },
 });
 
-// Seed data for Delta Exchange market simulation & fallback
-const FALLBACK_TICKERS = [
-  {
-    symbol: 'BTCUSD',
-    name: 'Bitcoin Perpetual',
-    underlying_asset: 'BTC',
-    contract_type: 'perpetual_futures',
-    mark_price: 94250.50,
-    index_price: 94238.10,
-    close: 94250.50,
-    open_24h: 91800.00,
-    high_24h: 95480.00,
-    low_24h: 91450.00,
-    change_24h_percent: 2.67,
-    volume_24h: 18452.84, // BTC
-    turnover_24h: 1739150000, // USD
-    open_interest: 42150.25,
-    funding_rate: 0.00012, // 0.012%
-    predicted_funding_rate: 0.00015,
-    quotes: {
-      best_bid: 94248.50,
-      best_ask: 94252.00,
-    },
-  },
-  {
-    symbol: 'ETHUSD',
-    name: 'Ethereum Perpetual',
-    underlying_asset: 'ETH',
-    contract_type: 'perpetual_futures',
-    mark_price: 3418.25,
-    index_price: 3416.80,
-    close: 3418.25,
-    open_24h: 3290.00,
-    high_24h: 3465.00,
-    low_24h: 3260.50,
-    change_24h_percent: 3.89,
-    volume_24h: 142850.10, // ETH
-    turnover_24h: 488260000, // USD
-    open_interest: 185400.00,
-    funding_rate: 0.00018,
-    predicted_funding_rate: 0.00016,
-    quotes: {
-      best_bid: 3417.80,
-      best_ask: 3418.70,
-    },
-  },
-  {
-    symbol: 'SOLUSD',
-    name: 'Solana Perpetual',
-    underlying_asset: 'SOL',
-    contract_type: 'perpetual_futures',
-    mark_price: 198.45,
-    index_price: 198.30,
-    close: 198.45,
-    open_24h: 187.20,
-    high_24h: 204.80,
-    low_24h: 185.90,
-    change_24h_percent: 6.01,
-    volume_24h: 894500.0,
-    turnover_24h: 177500000,
-    open_interest: 650000.0,
-    funding_rate: 0.00025,
-    predicted_funding_rate: 0.00028,
-    quotes: {
-      best_bid: 198.40,
-      best_ask: 198.50,
-    },
-  },
-  {
-    symbol: 'BTC-100000-CALL',
-    name: 'BTC $100K Call Option',
-    underlying_asset: 'BTC',
-    contract_type: 'call_options',
-    mark_price: 3120.00,
-    index_price: 94238.10,
-    close: 3120.00,
-    open_24h: 2450.00,
-    high_24h: 3340.00,
-    low_24h: 2390.00,
-    change_24h_percent: 27.35,
-    volume_24h: 2840.50,
-    turnover_24h: 8860000,
-    open_interest: 12500.0,
-    funding_rate: 0,
-    quotes: {
-      best_bid: 3110.00,
-      best_ask: 3130.00,
-    },
-  },
-  {
-    symbol: 'ETH-3600-CALL',
-    name: 'ETH $3600 Call Option',
-    underlying_asset: 'ETH',
-    contract_type: 'call_options',
-    mark_price: 145.50,
-    index_price: 3416.80,
-    close: 145.50,
-    open_24h: 98.00,
-    high_24h: 160.00,
-    low_24h: 94.50,
-    change_24h_percent: 48.47,
-    volume_24h: 18900.0,
-    turnover_24h: 2750000,
-    open_interest: 45000.0,
-    funding_rate: 0,
-    quotes: {
-      best_bid: 144.50,
-      best_ask: 146.50,
-    },
-  },
-  {
-    symbol: 'BTC-90000-PUT',
-    name: 'BTC $90K Put Option',
-    underlying_asset: 'BTC',
-    contract_type: 'put_options',
-    mark_price: 890.00,
-    index_price: 94238.10,
-    close: 890.00,
-    open_24h: 1420.00,
-    high_24h: 1480.00,
-    low_24h: 850.00,
-    change_24h_percent: -37.32,
-    volume_24h: 1980.20,
-    turnover_24h: 1760000,
-    open_interest: 9800.0,
-    funding_rate: 0,
-    quotes: {
-      best_bid: 885.00,
-      best_ask: 895.00,
-    },
-  },
-];
-
-// Generate synthetic candles for a symbol
-function generateCandles(symbol: string, resolution: string, count: number = 100) {
-  let basePrice = symbol.startsWith('BTC') ? (symbol.includes('CALL') || symbol.includes('PUT') ? 2500 : 94000) : (symbol.startsWith('ETH') ? (symbol.includes('CALL') ? 140 : 3400) : 198);
-  const now = Math.floor(Date.now() / 1000);
-  
-  let stepSeconds = 3600; // 1h default
-  if (resolution === '1m') stepSeconds = 60;
-  else if (resolution === '5m') stepSeconds = 300;
-  else if (resolution === '15m') stepSeconds = 900;
-  else if (resolution === '1h') stepSeconds = 3600;
-  else if (resolution === '4h') stepSeconds = 14400;
-  else if (resolution === '1d') stepSeconds = 86400;
-
-  const volatility = basePrice * 0.008;
-  const candles = [];
-  let currentClose = basePrice * 0.95;
-
-  for (let i = count; i >= 0; i--) {
-    const time = now - i * stepSeconds;
-    const change = (Math.random() - 0.485) * volatility;
-    const open = currentClose;
-    const close = Math.max(10, open + change);
-    const high = Math.max(open, close) + Math.random() * (volatility * 0.6);
-    const low = Math.min(open, close) - Math.random() * (volatility * 0.6);
-    const volume = Math.floor((Math.random() * 50 + 10) * (basePrice > 10000 ? 5 : 50));
-
-    candles.push({
-      time,
-      open: Number(open.toFixed(2)),
-      high: Number(high.toFixed(2)),
-      low: Number(low.toFixed(2)),
-      close: Number(close.toFixed(2)),
-      volume,
-    });
-
-    currentClose = close;
-  }
-
-  return candles;
-}
-
-// REST endpoint to get Delta tickers with live micro-fluctuations
+// REST endpoint for live Delta Exchange tickers; failures return unavailable.
 app.get('/api/delta/tickers', async (req, res) => {
   try {
     // Attempt live fetch from Delta Exchange API with a quick timeout
@@ -276,12 +102,12 @@ app.get('/api/delta/tickers', async (req, res) => {
           }));
 
         if (mapped.length > 0) {
-          return res.json({ success: true, source: 'delta_live', tickers: mapped });
+          return res.json({ success: true, source: 'delta_live', fetchedAt: Date.now(), tickers: mapped });
         }
       }
     }
   } catch (err) {
-    // Delta network error or timeout, smoothly fall back to high-grade simulated tickers
+    // Delta network error or timeout; never substitute simulated market prices.
   }
 
   res.status(502).json({ success: false, source: 'unavailable', error: 'Delta India ticker feed unavailable; no simulated prices returned.' });
@@ -317,14 +143,90 @@ app.get('/api/delta/candles', async (req, res) => {
           }))
           .sort((a: any, b: any) => a.time - b.time);
 
-        return res.json({ success: true, source: 'delta_live', candles: sorted });
+        return res.json({ success: true, source: 'delta_live', fetchedAt: Date.now(), candles: sorted });
       }
     }
   } catch (err) {
-    // Fall back to synthetic candles
+    // Do not substitute synthetic candles for an unavailable exchange response.
   }
 
   res.status(502).json({ success: false, source: 'unavailable', error: 'Delta India candle feed unavailable; no simulated candles returned.' });
+});
+
+
+// Public, read-only Delta India market microstructure endpoints.
+// Exchange timestamps are supplied in microseconds and normalized to milliseconds.
+const validMarketSymbol = (value: unknown): string | null => {
+  const symbol = String(value || '').toUpperCase();
+  return /^[A-Z0-9_-]{2,40}$/.test(symbol) ? symbol : null;
+};
+
+app.get('/api/delta/orderbook/:symbol', async (req, res) => {
+  const symbol = validMarketSymbol(req.params.symbol);
+  if (!symbol) return res.status(400).json({ success: false, error: 'invalid_symbol' });
+  try {
+    const upstream = await fetch(
+      `https://api.india.delta.exchange/v2/l2orderbook/${encodeURIComponent(symbol)}?depth=20`,
+      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) }
+    );
+    if (!upstream.ok) return res.status(502).json({ success: false, source: 'unavailable', error: 'delta_orderbook_http_error' });
+    const payload: any = await upstream.json();
+    const book = payload?.result;
+    if (!payload?.success || !book || !Array.isArray(book.buy) || !Array.isArray(book.sell)) {
+      return res.status(502).json({ success: false, source: 'unavailable', error: 'delta_orderbook_invalid_response' });
+    }
+    const levels = (rows: any[], side: 'buy' | 'sell') => rows
+      .map((row) => ({ price: Number(row.price), size: Number(row.size) }))
+      .filter((row) => Number.isFinite(row.price) && row.price > 0 && Number.isFinite(row.size) && row.size >= 0)
+      .sort((a, b) => side === 'buy' ? b.price - a.price : a.price - b.price)
+      .slice(0, 20)
+      .map((row, index, all) => ({
+        ...row,
+        total: all.slice(0, index + 1).reduce((sum, item) => sum + item.size, 0),
+      }));
+    const exchangeTimestamp = Number(book.last_updated_at);
+    return res.json({
+      success: true, source: 'delta_india_rest', symbol,
+      fetchedAt: Date.now(),
+      exchangeTimestamp: Number.isFinite(exchangeTimestamp) ? Math.floor(exchangeTimestamp / 1000) : null,
+      bids: levels(book.buy, 'buy'), asks: levels(book.sell, 'sell'),
+    });
+  } catch (_error) {
+    return res.status(502).json({ success: false, source: 'unavailable', error: 'delta_orderbook_unavailable' });
+  }
+});
+
+app.get('/api/delta/trades/:symbol', async (req, res) => {
+  const symbol = validMarketSymbol(req.params.symbol);
+  if (!symbol) return res.status(400).json({ success: false, error: 'invalid_symbol' });
+  try {
+    const upstream = await fetch(
+      `https://api.india.delta.exchange/v2/trades/${encodeURIComponent(symbol)}`,
+      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) }
+    );
+    if (!upstream.ok) return res.status(502).json({ success: false, source: 'unavailable', error: 'delta_trades_http_error' });
+    const payload: any = await upstream.json();
+    const rows = Array.isArray(payload?.result) ? payload.result : payload?.result?.trades;
+    if (!payload?.success || !Array.isArray(rows)) {
+      return res.status(502).json({ success: false, source: 'unavailable', error: 'delta_trades_invalid_response' });
+    }
+    const trades = rows.map((row: any, index: number) => {
+      const timestamp = Number(row.timestamp);
+      const buyerTaker = row.buyer_role === 'taker';
+      const sellerTaker = row.seller_role === 'taker';
+      return {
+        id: String(row.id ?? `${timestamp}-${index}-${row.price}`),
+        price: Number(row.price), size: Number(row.size),
+        side: buyerTaker ? 'buy' : sellerTaker ? 'sell' : 'unknown',
+        timestamp: Number.isFinite(timestamp) ? Math.floor(timestamp / 1000) : null,
+      };
+    }).filter((trade: any) => Number.isFinite(trade.price) && trade.price > 0 &&
+      Number.isFinite(trade.size) && trade.size >= 0 && trade.timestamp !== null)
+      .slice(0, 100);
+    return res.json({ success: true, source: 'delta_india_rest', symbol, fetchedAt: Date.now(), trades });
+  } catch (_error) {
+    return res.status(502).json({ success: false, source: 'unavailable', error: 'delta_trades_unavailable' });
+  }
 });
 
 // Gemini AI Market Research Analyst
@@ -371,29 +273,8 @@ Return ONLY valid JSON matching this structure without markdown formatting or co
     res.json({ success: true, analysis: parsed });
   } catch (error: any) {
     console.error('Gemini market analysis error:', error);
-    // Provide structured default analysis if API key is unconfigured or rate limited
-    res.json({
-      success: true,
-      analysis: {
-        regime: 'Bullish Momentum Expansion',
-        sentiment: 'Aggressive Bullish',
-        keyLevels: {
-          support: ['$92,400', '$90,850'],
-          resistance: ['$95,500', '$98,200'],
-        },
-        orderFlowBias: 'Positive Delta Exchange open interest with healthy funding rate indicates spot-led perpetual accumulation.',
-        tradeSetup: {
-          direction: 'LONG',
-          entryZone: 'Pullback to $93,800 - $94,100',
-          takeProfit1: '$96,500',
-          takeProfit2: '$99,200',
-          stopLoss: '$92,200',
-          riskRewardRatio: '1:3.1',
-        },
-        algoRecommendation: 'EMA 20/50 Trend Following Ribbon with Trailing Volatility Stop',
-        summary: 'Bitcoin exhibits sustained buy pressure on Delta Exchange perps. With funding holding moderate, upward continuation towards psychological $100K remains the higher probability path.',
-      },
-    });
+    // Never return invented levels or a fabricated trading setup when analysis fails.
+    res.status(503).json({ success: false, error: 'market_analysis_unavailable' });
   }
 });
 

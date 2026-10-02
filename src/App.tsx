@@ -13,6 +13,7 @@ import { DataExplorerView } from './components/DataExplorerView';
 import { OrderBookReconstructionView } from './components/OrderBookReconstructionView';
 import { DeltaAnalyticsView } from './components/DeltaAnalyticsView';
 import { ResearchLabView } from './components/ResearchLabView';
+import { IndicatorWorkbenchView } from './components/IndicatorWorkbenchView';
 import { IndicatorBuilderView } from './components/IndicatorBuilderView';
 import { ValidationReportsView } from './components/ValidationReportsView';
 import { IndicatorRegistryView } from './components/IndicatorRegistryView';
@@ -60,7 +61,7 @@ export default function App() {
   const [appMode, setAppMode] = useState<'research' | 'terminal'>('research');
   const [researchTab, setResearchTab] = useState<ResearchTabType>('overview');
   const [datasetId, setDatasetId] = useState<string>('BTCUSDT-L2-SYNTH-240M');
-  const [symbol, setSymbol] = useState<string>('BTCUSDT');
+  const [symbol, setSymbol] = useState<string>('BTCUSD');
 
   // Microstructure Research Datasets
   const [microData, setMicroData] = useState(() => generateSyntheticMicrostructureData(240, 94350));
@@ -352,7 +353,10 @@ export default function App() {
               />
             )}
 
-            {/* 6. Indicator Builder */}
+            {/* 6. Indicator Workbench: candle replay and deterministic diagnostics */}
+            {researchTab === 'indicator_workbench' && <IndicatorWorkbenchView candles={candles} symbol={symbol} resolution={resolution} />}
+
+            {/* 7. Indicator Builder */}
             {researchTab === 'indicator_builder' && (
               <IndicatorBuilderView onRegisterIndicator={handleRegisterIndicator} />
             )}

@@ -23,6 +23,7 @@ export type ResearchTabType =
   | 'order_book'
   | 'delta_analytics'
   | 'research_lab'
+  | 'indicator_workbench'
   | 'indicator_builder'
   | 'validation_reports'
   | 'indicator_registry'
@@ -58,11 +59,12 @@ export const ResearchHeader: React.FC<ResearchHeaderProps> = ({
     { id: 'order_book', label: '3. Order Book', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'delta_analytics', label: '4. Delta Analytics', icon: <BarChart3 className="w-3.5 h-3.5" /> },
     { id: 'research_lab', label: '5. Research Lab', icon: <FlaskConical className="w-3.5 h-3.5" /> },
-    { id: 'indicator_builder', label: '6. Indicator Builder', icon: <Wrench className="w-3.5 h-3.5" /> },
-    { id: 'validation_reports', label: '7. Validation Reports', icon: <FileCheck2 className="w-3.5 h-3.5" /> },
-    { id: 'indicator_registry', label: '8. Indicator Registry', icon: <BookOpen className="w-3.5 h-3.5" /> },
-    { id: 'data_quality', label: '9. Data Quality', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
-    { id: 'settings_bridge', label: '10. Settings & Baseline', icon: <Settings className="w-3.5 h-3.5" /> },
+    { id: 'indicator_workbench', label: '6. Indicator Workbench', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+    { id: 'indicator_builder', label: '7. Indicator Builder', icon: <Wrench className="w-3.5 h-3.5" /> },
+    { id: 'validation_reports', label: '8. Validation Reports', icon: <FileCheck2 className="w-3.5 h-3.5" /> },
+    { id: 'indicator_registry', label: '9. Indicator Registry', icon: <BookOpen className="w-3.5 h-3.5" /> },
+    { id: 'data_quality', label: '10. Data Quality', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
+    { id: 'settings_bridge', label: '11. Settings & Baseline', icon: <Settings className="w-3.5 h-3.5" /> },
   ];
 
   return (
