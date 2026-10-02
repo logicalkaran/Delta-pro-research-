@@ -71,7 +71,7 @@ export const AndroidFrame: React.FC<AndroidFrameProps> = ({
               </span>
               <span className="flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                {sourceType === 'delta_live' ? 'DELTA API LIVE' : 'SYNC FEED LIVE'}
+                {sourceType === 'delta_live' ? 'DELTA INDIA LIVE' : 'FEED UNAVAILABLE'}
               </span>
             </div>
             <p className="text-xs text-slate-400">

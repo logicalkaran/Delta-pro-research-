@@ -15,6 +15,32 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Read-only proxy to the existing local BTC/Delta project. The bridge binds
+// to loopback and requires a bearer token; no order-placement route is exposed.
+async function proxyBtcBridge(route: string, res: any, timeoutMs = 5000) {
+  const token = process.env.BTC_DELTA_BRIDGE_TOKEN;
+  if (!token || token.length < 32) {
+    return res.status(503).json({ error: 'btc_bridge_not_configured' });
+  }
+  const base = process.env.BTC_DELTA_BRIDGE_URL || 'http://127.0.0.1:8788';
+  try {
+    const upstream = await fetch(base + route, {
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.status(upstream.status).json(await upstream.json());
+  } catch (_error) {
+    return res.status(503).json({ error: 'btc_bridge_unavailable' });
+  }
+}
+
+app.get('/api/btc-engine/health', (_req, res) =>
+  proxyBtcBridge('/health', res, 4000)
+);
+app.get('/api/btc-engine/snapshot', (_req, res) =>
+  proxyBtcBridge('/snapshot', res, 30000)
+);
+
 // Initialize GoogleGenAI server-side with required headers
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || '',
@@ -206,7 +232,7 @@ app.get('/api/delta/tickers', async (req, res) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-    const deltaRes = await fetch('https://api.delta.exchange/v2/tickers', {
+    const deltaRes = await fetch('https://api.india.delta.exchange/v2/tickers', {
       headers: {
         'Accept': 'application/json',
       },
@@ -219,37 +245,35 @@ app.get('/api/delta/tickers', async (req, res) => {
       if (data && data.result && Array.isArray(data.result) && data.result.length > 0) {
         // Filter relevant BTC and ETH perpetual and options products
         const mapped = data.result
-          .filter((t: any) => t.symbol && (t.symbol.includes('BTC') || t.symbol.includes('ETH') || t.symbol.includes('SOL')))
-          .slice(0, 20)
-          .map((t: any) => {
-            const mark = Number(t.mark_price || t.close || 0);
-            const close = Number(t.close || mark);
-            const open = Number(t.open_24h || close);
-            const changePercent = open > 0 ? ((close - open) / open) * 100 : 0;
-
-            return {
-              symbol: t.symbol,
-              name: t.contract_type ? `${t.symbol} (${t.contract_type})` : t.symbol,
-              underlying_asset: t.symbol.startsWith('BTC') ? 'BTC' : (t.symbol.startsWith('ETH') ? 'ETH' : 'SOL'),
-              contract_type: t.contract_type || 'perpetual_futures',
-              mark_price: mark,
-              index_price: Number(t.index_price || mark),
-              close: close,
-              open_24h: open,
-              high_24h: Number(t.high_24h || close * 1.03),
-              low_24h: Number(t.low_24h || close * 0.97),
-              change_24h_percent: Number(changePercent.toFixed(2)),
-              volume_24h: Number(t.volume || 1000),
-              turnover_24h: Number(t.turnover_symbol || t.turnover || mark * 1000),
-              open_interest: Number(t.open_interest || 5000),
-              funding_rate: Number(t.funding_rate || 0.0001),
-              predicted_funding_rate: Number(t.predicted_funding_rate || 0.00012),
-              quotes: {
-                best_bid: Number(t.quotes?.best_bid || mark * 0.9998),
-                best_ask: Number(t.quotes?.best_ask || mark * 1.0002),
-              },
-            };
-          });
+          .filter((t: any) => t.symbol && ['BTC', 'ETH', 'SOL'].includes(String(t.underlying_asset_symbol || '').toUpperCase()))
+          .sort((a: any, b: any) => {
+            const ap = a.contract_type === 'perpetual_futures' ? 1 : 0;
+            const bp = b.contract_type === 'perpetual_futures' ? 1 : 0;
+            return bp - ap || Number(b.turnover_usd || b.turnover || 0) - Number(a.turnover_usd || a.turnover || 0);
+          })
+          .slice(0, 30)
+          .map((t: any) => ({
+            symbol: t.symbol,
+            name: t.description || t.symbol,
+            underlying_asset: String(t.underlying_asset_symbol).toUpperCase(),
+            contract_type: t.contract_type || 'unknown',
+            mark_price: Number(t.mark_price ?? t.close ?? 0),
+            index_price: Number(t.spot_price ?? t.mark_price ?? 0),
+            close: Number(t.close ?? 0),
+            open_24h: Number(t.open ?? 0),
+            high_24h: Number(t.mark_high_24h ?? t.high ?? 0),
+            low_24h: Number(t.mark_low_24h ?? t.low ?? 0),
+            change_24h_percent: Number(t.ltp_change_24h ?? t.mark_change_24h ?? 0),
+            volume_24h: Number(t.volume ?? 0),
+            turnover_24h: Number(t.turnover_usd ?? t.turnover ?? 0),
+            open_interest: Number(t.oi_contracts ?? t.oi ?? 0),
+            funding_rate: Number(t.funding_rate ?? 0),
+            predicted_funding_rate: Number(t.predicted_funding_rate ?? 0),
+            quotes: {
+              best_bid: Number(t.quotes?.best_bid ?? 0),
+              best_ask: Number(t.quotes?.best_ask ?? 0),
+            },
+          }));
 
         if (mapped.length > 0) {
           return res.json({ success: true, source: 'delta_live', tickers: mapped });
@@ -260,24 +284,7 @@ app.get('/api/delta/tickers', async (req, res) => {
     // Delta network error or timeout, smoothly fall back to high-grade simulated tickers
   }
 
-  // Fallback with micro-random drift
-  const updatedFallback = FALLBACK_TICKERS.map(t => {
-    const drift = (Math.random() - 0.49) * 0.0015;
-    const newMark = Number((t.mark_price * (1 + drift)).toFixed(2));
-    const newBid = Number((newMark * 0.9998).toFixed(2));
-    const newAsk = Number((newMark * 1.0002).toFixed(2));
-    return {
-      ...t,
-      mark_price: newMark,
-      close: newMark,
-      quotes: {
-        best_bid: newBid,
-        best_ask: newAsk,
-      },
-    };
-  });
-
-  res.json({ success: true, source: 'simulated_feed', tickers: updatedFallback });
+  res.status(502).json({ success: false, source: 'unavailable', error: 'Delta India ticker feed unavailable; no simulated prices returned.' });
 });
 
 // REST endpoint to get Delta Candles history
@@ -291,7 +298,7 @@ app.get('/api/delta/candles', async (req, res) => {
 
     // Delta resolution formatting: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 1d
     const deltaRes = await fetch(
-      `https://api.delta.exchange/v2/history/candles?resolution=${resolution}&symbol=${symbol}`,
+      `https://api.india.delta.exchange/v2/history/candles?resolution=${resolution}&symbol=${symbol}&start=${Math.floor(Date.now() / 1000) - 120 * ({ '1m': 60, '3m': 180, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '2h': 7200, '4h': 14400, '6h': 21600, '1d': 86400 }[resolution] || 3600)}&end=${Math.floor(Date.now() / 1000)}`,
       { signal: controller.signal }
     );
     clearTimeout(timeoutId);
@@ -317,8 +324,7 @@ app.get('/api/delta/candles', async (req, res) => {
     // Fall back to synthetic candles
   }
 
-  const fallbackCandles = generateCandles(symbol, resolution, 120);
-  res.json({ success: true, source: 'simulated_feed', candles: fallbackCandles });
+  res.status(502).json({ success: false, source: 'unavailable', error: 'Delta India candle feed unavailable; no simulated candles returned.' });
 });
 
 // Gemini AI Market Research Analyst

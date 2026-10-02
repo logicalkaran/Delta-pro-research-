@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Settings,
   Shield,
@@ -25,6 +25,34 @@ export const SettingsAndBridgeView: React.FC<SettingsAndBridgeViewProps> = ({
 }) => {
   const [testResults, setTestResults] = useState<TestResultItem[]>([]);
   const [isRunningTests, setIsRunningTests] = useState(false);
+  const [bridgeStatus, setBridgeStatus] = useState<'checking' | 'connected' | 'unavailable'>('checking');
+  const [bridgeSnapshot, setBridgeSnapshot] = useState<any>(null);
+  const [isRefreshingBridge, setIsRefreshingBridge] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/btc-engine/health')
+      .then((response) => {
+        if (!response.ok) throw new Error('bridge unavailable');
+        setBridgeStatus('connected');
+      })
+      .catch(() => setBridgeStatus('unavailable'));
+  }, []);
+
+  const refreshBtcSnapshot = async () => {
+    setIsRefreshingBridge(true);
+    try {
+      const response = await fetch('/api/btc-engine/snapshot');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'bridge unavailable');
+      setBridgeSnapshot(data);
+      setBridgeStatus('connected');
+    } catch (_error) {
+      setBridgeStatus('unavailable');
+      setBridgeSnapshot(null);
+    } finally {
+      setIsRefreshingBridge(false);
+    }
+  };
 
   const handleExecuteTests = () => {
     setIsRunningTests(true);
@@ -131,6 +159,43 @@ export const SettingsAndBridgeView: React.FC<SettingsAndBridgeViewProps> = ({
           <span>{isRunningTests ? 'Running Assertions...' : 'Run Quantitative Test Suite'}</span>
         </button>
       </div>
+
+      {/* Existing BTC/Delta project bridge: read-only snapshot */}
+      <section className="p-5 rounded-2xl bg-[#0d121f] border border-cyan-500/30 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-sm text-white">BTC Fisher / Delta Engine Bridge</h3>
+            <p className="text-xs text-slate-400">Read-only connection to the existing local Python project. No order placement.</p>
+          </div>
+          <span className={`text-xs px-3 py-1 rounded-full border ${bridgeStatus === 'connected' ? 'text-emerald-300 border-emerald-700 bg-emerald-950/40' : 'text-amber-300 border-amber-700 bg-amber-950/30'}`}>
+            {bridgeStatus === 'checking' ? 'CHECKING' : bridgeStatus === 'connected' ? 'BRIDGE REACHABLE' : 'UNAVAILABLE'}
+          </span>
+        </div>
+        <button onClick={refreshBtcSnapshot} disabled={isRefreshingBridge} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-white text-xs font-bold">
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingBridge ? 'animate-spin' : ''}`} />
+          {isRefreshingBridge ? 'Reading engine…' : 'Refresh BTC engine snapshot'}
+        </button>
+        {bridgeSnapshot ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-[#090d16] border border-slate-800">
+              <div className="text-slate-400 mb-2">Order-flow feature feed</div>
+              <div className="text-white font-bold">{bridgeSnapshot.orderflow?.status || 'unknown'}</div>
+              <div className="text-slate-400 mt-1">Latest depth imbalance (5): {bridgeSnapshot.orderflow?.latest?.imbalance_5 ?? '—'}</div>
+              <div className="text-slate-400">Feed age: {bridgeSnapshot.orderflow?.age_seconds ?? 'unknown'} seconds</div>
+            </div>
+            <div className="p-3 rounded-xl bg-[#090d16] border border-slate-800">
+              <div className="text-slate-400 mb-2">Frozen Monthly Fisher</div>
+              <div className="text-white font-bold">{bridgeSnapshot.monthly_fisher?.status || 'unknown'}</div>
+              <div className="text-slate-400 mt-1">Month: {bridgeSnapshot.monthly_fisher?.latest?.month || '—'}</div>
+              <div className="text-slate-400">Fisher: {bridgeSnapshot.monthly_fisher?.latest?.fisher ?? '—'} | Trigger: {bridgeSnapshot.monthly_fisher?.latest?.trigger ?? '—'}</div>
+              <div className="text-slate-400">Bullish cross: {String(bridgeSnapshot.monthly_fisher?.latest?.bullish_cross ?? '—')}</div>
+            </div>
+            <div className="sm:col-span-2 text-[11px] text-slate-500">Read-only snapshot. This panel does not submit orders or change strategy parameters.</div>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400">No engine snapshot loaded. Start the authenticated local bridge and run DeltaPro on the same device, then refresh.</p>
+        )}
+      </section>
 
       {/* Frozen Production Strategy Card */}
       <div className="p-5 rounded-2xl bg-[#0d121f] border border-purple-500/40 space-y-3">

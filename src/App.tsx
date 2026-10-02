@@ -88,7 +88,7 @@ export default function App() {
   // Preserved Live Trading Terminal State
   const [terminalTab, setTerminalTab] = useState<'markets' | 'chart' | 'alerts' | 'dashboard' | 'algo'>('chart');
   const [resolution, setResolution] = useState<string>('1h');
-  const [sourceType, setSourceType] = useState<string>('delta_live');
+  const [sourceType, setSourceType] = useState<string>('unavailable');
   const [tickers, setTickers] = useState<Ticker[]>([]);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [isLoadingCandles, setIsLoadingCandles] = useState<boolean>(false);
@@ -150,8 +150,13 @@ export default function App() {
       if (data.success && Array.isArray(data.tickers) && data.tickers.length > 0) {
         setTickers(data.tickers);
         setSourceType(data.source || 'delta_live');
+      } else {
+        setTickers([]);
+        setSourceType('unavailable');
       }
     } catch (err) {
+      setTickers([]);
+      setSourceType('unavailable');
       console.warn('Ticker fetch error:', err);
     }
   }, []);
@@ -164,8 +169,11 @@ export default function App() {
       const data = await res.json();
       if (data.success && Array.isArray(data.candles) && data.candles.length > 0) {
         setCandles(data.candles);
+      } else {
+        setCandles([]);
       }
     } catch (err) {
+      setCandles([]);
       console.warn('Candle fetch error:', err);
     } finally {
       setIsLoadingCandles(false);
@@ -227,15 +235,15 @@ export default function App() {
   };
 
   const currentTicker = tickers.find((t) => t.symbol === symbol) || tickers[0] || {
-    symbol: 'BTCUSDT',
-    name: 'Bitcoin Perpetual',
-    mark_price: 94350,
-    change_24h_percent: 2.45,
-    high_24h: 95500,
-    low_24h: 91400,
-    volume_24h: 18450,
-    funding_rate: 0.00012,
-    quotes: { best_bid: 94348, best_ask: 94352 },
+    symbol: 'BTCUSD',
+    name: 'BTC live feed unavailable',
+    mark_price: 0,
+    change_24h_percent: 0,
+    high_24h: 0,
+    low_24h: 0,
+    volume_24h: 0,
+    funding_rate: 0,
+    quotes: { best_bid: 0, best_ask: 0 },
   };
 
   return (
