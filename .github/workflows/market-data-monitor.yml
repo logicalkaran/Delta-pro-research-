@@ -1,0 +1,58 @@
+name: DeltaPro CI and hourly market-data monitor
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deltapro-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Type-check
+        run: npm run lint
+      - name: Validate indicators and research
+        run: npm run test:indicators
+      - name: Build production bundle
+        run: npm run build
+      - name: Start API
+        shell: bash
+        run: |
+          npm start > /tmp/deltapro-server.log 2>&1 &
+          echo $! > /tmp/deltapro-server.pid
+          for attempt in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:3000/api/delta/tickers >/dev/null; then
+              echo "API ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/deltapro-server.log
+          exit 1
+      - name: Check live public market data
+        run: npm run test:market-data
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f /tmp/deltapro-server.pid ]; then
+            kill "$(cat /tmp/deltapro-server.pid)" 2>/dev/null || true
+          fi
