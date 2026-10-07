@@ -5,6 +5,7 @@ trade path so the leaderboard is not conditioned on portfolio selection.
 """
 from __future__ import annotations
 import json, signal, time
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 STATE=ROOT/"data/live_microstructure_state.json"
@@ -31,13 +32,18 @@ def f(x,d=0.0):
     try:return float(x)
     except:return d
 def tick(p):return round(p/TICK)*TICK
+def ist_session(ts):
+    dt=datetime.fromtimestamp(ts,tz=timezone.utc)+timedelta(hours=5,minutes=30)
+    h=dt.hour
+    return "00-06" if h<6 else "06-12" if h<12 else "12-18" if h<18 else "18-24"
 def fee(p,b):return p*CONTRACT_BTC*CONTRACTS*b/10000
 def log(row):
     OUT.parent.mkdir(parents=True,exist_ok=True)
     with OUT.open("a") as h:h.write(json.dumps(row,separators=(",",":"))+"\n")
 
-def make_position(strategy,route,side,entry,now,score):
+def make_position(strategy,route,side,entry,now,score,regime):
     return {"strategy":strategy,"route":route,"side":side,"entry":entry,"opened":now,
+            "regime":regime,"ist_session":ist_session(now),
             "stop":tick(entry*(1-STOP_BPS/10000)) if side=="LONG" else tick(entry*(1+STOP_BPS/10000)),
             "target":tick(entry*(1+TARGET_BPS/10000)) if side=="LONG" else tick(entry*(1-TARGET_BPS/10000)),
             "entry_fee":fee(entry,MAKER_FEE if route=="MAKER" else TAKER_FEE),
@@ -99,7 +105,7 @@ def main(seconds=86400):
             c["queue"]-=consumed
             crossed=(c["side"]=="LONG" and ask<=c["limit"]) or (c["side"]=="SHORT" and bid>=c["limit"])
             if c["queue"]<=0 or crossed:
-                active[strategy]=make_position(strategy,"MAKER",c["side"],c["limit"],now,c["score"])
+                active[strategy]=make_position(strategy,"MAKER",c["side"],c["limit"],now,c["score"],c["regime"])
                 stats["maker_fills"]+=1
                 log({"ts":now,"event":"SHADOW_MAKER_FILL","position":active[strategy]})
                 del pending[strategy]
@@ -123,11 +129,12 @@ def main(seconds=86400):
             if route.mode=="MAKER":
                 side=sig.action;limit=tick(bid if side=="LONG" else ask)
                 pending[sig.strategy]={"created":now,"strategy":sig.strategy,"side":side,"limit":limit,
-                                       "queue":max(1,qa),"score":sig.score}
+                                       "queue":max(1,qa),"score":sig.score,"regime":s.get("regime","UNKNOWN"),
+                                       "ist_session":ist_session(now)}
                 stats["posted"]+=1;log({"ts":now,"event":"SHADOW_POST_ONLY","candidate":pending[sig.strategy]})
             elif route.mode=="TAKER_PAPER":
                 side=sig.action;entry=ask+TICK if side=="LONG" else bid-TICK
-                active[sig.strategy]=make_position(sig.strategy,"TAKER_PAPER",side,entry,now,sig.score)
+                active[sig.strategy]=make_position(sig.strategy,"TAKER_PAPER",side,entry,now,sig.score,s.get("regime","UNKNOWN"))
                 stats["taker_fills"]+=1;log({"ts":now,"event":"SHADOW_TAKER_FILL","position":active[sig.strategy]})
         time.sleep(.25)
 
