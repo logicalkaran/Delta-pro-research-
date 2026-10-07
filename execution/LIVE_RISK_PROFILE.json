@@ -1,0 +1,14 @@
+{
+  "symbol": "BTCUSD",
+  "leverage": 200,
+  "max_contracts": 1,
+  "rr": 2,
+  "balance_usd": 2.76229053,
+  "execution_mode": "GUARDED",
+  "order_submission": "DISABLED",
+  "max_one_position": true,
+  "no_averaging": true,
+  "no_martingale": true,
+  "stop_required": true,
+  "note": "200x retained at user's explicit request; verify margin immediately before any live order."
+}

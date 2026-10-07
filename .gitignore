@@ -11,10 +11,14 @@ env/
 # Environment / secrets
 .env
 
-# Runtime state
+# Runtime / market data (never version generated market streams)
 data/runtime_state.json
 data/paper_trades.json
-data/*.tmp
+data/live_*.json
+data/raw/
+data/processed/
+data/run/
+*.tmp
 
 # Logs
 logs/
@@ -24,11 +28,13 @@ logs/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+data/test_artifacts/
 
 # Termux / editor artifacts
 *.swp
 *.swo
 *~
 
-# Test artifacts
-data/test_artifacts/
+# OS/editor
+.DS_Store
+Thumbs.db

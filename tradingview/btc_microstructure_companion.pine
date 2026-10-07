@@ -1,0 +1,64 @@
+//@version=6
+indicator("BTC Microstructure Companion — Free", shorttitle="BTC Micro", overlay=false, max_labels_count=100)
+
+len = input.int(20, "Flow smoothing", minval=2)
+fastLen = input.int(5, "Fast window", minval=1)
+slowLen = input.int(30, "Slow window", minval=2)
+showSignals = input.bool(true, "Show confirmation markers")
+
+rng = math.max(high - low, syminfo.mintick)
+buyVol = volume * math.max(close - low, 0) / rng
+sellVol = volume * math.max(high - close, 0) / rng
+flow = buyVol - sellVol
+
+cvd = ta.cum(flow)
+cvdDelta = cvd - cvd[slowLen]
+flowFast = ta.sum(flow, fastLen)
+flowSlow = ta.sum(flow, slowLen)
+
+priceReturnFast = 100 * (close / close[fastLen] - 1)
+priceReturnSlow = 100 * (close / close[slowLen] - 1)
+
+flowRatio = ta.sum(buyVol, slowLen) / math.max(ta.sum(volume, slowLen), 1)
+buyPressure = flowRatio > 0.55
+sellPressure = flowRatio < 0.45
+
+buyerConfirmation = buyPressure and cvdDelta > 0 and priceReturnSlow > 0
+sellerConfirmation = sellPressure and cvdDelta < 0 and priceReturnSlow < 0
+buyerAbsorption = buyPressure and cvdDelta > 0 and priceReturnSlow <= 0
+sellerAbsorption = sellPressure and cvdDelta < 0 and priceReturnSlow >= 0
+
+regime = buyerConfirmation ? "BUYER CONFIRMATION" :
+     sellerConfirmation ? "SELLER CONFIRMATION" :
+     buyerAbsorption ? "BUYER ABSORPTION" :
+     sellerAbsorption ? "SELLER ABSORPTION" :
+     buyPressure ? "BUY PRESSURE" :
+     sellPressure ? "SELL PRESSURE" : "BALANCED"
+
+plot(flowFast, "Fast Flow", style=plot.style_columns)
+plot(ta.sma(flow, len), "Flow SMA", linewidth=2)
+plot(cvdDelta, "CVD Delta", linewidth=2)
+hline(0, "Zero")
+
+plotshape(showSignals and buyerConfirmation, title="Buyer confirmation", style=shape.triangleup,
+     location=location.bottom, size=size.tiny, text="BUY")
+plotshape(showSignals and sellerConfirmation, title="Seller confirmation", style=shape.triangledown,
+     location=location.top, size=size.tiny, text="SELL")
+
+var table t = table.new(position.top_right, 2, 6, border_width=1)
+if barstate.islast
+    table.cell(t, 0, 0, "BTC MICROSTRUCTURE")
+    table.cell(t, 1, 0, regime)
+    table.cell(t, 0, 1, "Fast flow")
+    table.cell(t, 1, 1, str.tostring(flowFast, format.volume))
+    table.cell(t, 0, 2, "Slow CVD Δ")
+    table.cell(t, 1, 2, str.tostring(cvdDelta, format.volume))
+    table.cell(t, 0, 3, "Return")
+    table.cell(t, 1, 3, str.tostring(priceReturnSlow, "#.####") + "%")
+    table.cell(t, 0, 4, "Buy share")
+    table.cell(t, 1, 4, str.tostring(flowRatio * 100, "#.##") + "%")
+    table.cell(t, 0, 5, "Source")
+    table.cell(t, 1, 5, "TradingView OHLCV")
+
+alertcondition(buyerConfirmation, "Buyer confirmation", "BTC buyer confirmation detected")
+alertcondition(sellerConfirmation, "Seller confirmation", "BTC seller confirmation detected")

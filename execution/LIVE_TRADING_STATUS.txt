@@ -1,0 +1,14 @@
+BTCUSD LIVE EXECUTION STATUS
+
+REAL ORDER SUBMISSION: DISABLED
+MAX CONTRACTS: 1
+ACCOUNT REFERENCE: $2.50 (user-provided)
+TARGET RR: 1:2 minimum
+MAX ESTIMATED LOSS INCLUDING ENTRY+STOP TAKER FEES: $0.35
+CONTRACT SIZE: 0.001 BTC
+PRICE TICK: $0.50
+TAKER FEE ASSUMPTION: 0.059% including 18% GST on the 0.05% taker fee; conservative, verify current account-specific fee/offer before live execution.
+
+The live order switch is intentionally not present in this layer.
+Do not place an order unless a current V3.1 signal passes the guard,
+the account balance is confirmed, and the user explicitly enables live execution.

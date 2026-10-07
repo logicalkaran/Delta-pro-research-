@@ -1,0 +1,13 @@
+{
+  "status": "BLOCKED_UNTIL_VALIDATED",
+  "minimum_labeled_trades": 100,
+  "minimum_active_accuracy": 0.55,
+  "minimum_avg_net_bps": 0.0,
+  "minimum_profit_factor": 1.2,
+  "require_positive_walk_forward_net": true,
+  "require_cost_model": "conservative",
+  "require_manual_operator_approval": true,
+  "require_real_order_submission_switch": true,
+  "paper_only_until_all_conditions_pass": true,
+  "note": "No real-money promotion from a tiny sample or gross-return-only result."
+}
