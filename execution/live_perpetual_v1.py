@@ -24,7 +24,8 @@ def load_state():
 
 
 def live_armed() -> bool:
-    return os.getenv("BTC_LIVE_EXECUTION", "").lower() == "true"
+    from execution.live_execution_gate import check
+    return bool(check()["eligible"])
 
 
 def signal(state: dict) -> str | None:

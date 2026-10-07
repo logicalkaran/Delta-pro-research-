@@ -37,10 +37,8 @@ class DeltaExecutor:
             return {"dry_run": True, "payload": payload}
         if os.getenv("BTC_LIVE_EXECUTION", "").lower() != "true":
             raise LiveExecutionBlocked("BTC_LIVE_EXECUTION is not enabled")
-        from live_readiness_gate import evaluate
-        gate = evaluate()
-        if not gate["eligible"]:
-            raise LiveExecutionBlocked("live-readiness gate is locked")
+        from execution.live_execution_gate import require
+        require()
         if self.client.environment != "prod":
             raise LiveExecutionBlocked("production execution requires DELTA_ENV=prod")
         return self.client.place_order(payload)
@@ -72,10 +70,8 @@ class DeltaExecutor:
             return {"dry_run": True, "payload": payload}
         if os.getenv("BTC_LIVE_EXECUTION", "").lower() != "true":
             raise LiveExecutionBlocked("BTC_LIVE_EXECUTION is not enabled")
-        from live_readiness_gate import evaluate
-        gate = evaluate()
-        if not gate["eligible"]:
-            raise LiveExecutionBlocked("live-readiness gate is locked")
+        from execution.live_execution_gate import require
+        require()
         if self.client.environment != "prod":
             raise LiveExecutionBlocked("production execution requires DELTA_ENV=prod")
         return self.client.place_order(payload)
