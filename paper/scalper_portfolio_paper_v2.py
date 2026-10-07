@@ -57,6 +57,7 @@ def main(seconds=86400):
     edge=min(30.0,best.expected_move_bps*.65)
     route=decide(signal_edge_bps=edge,spread_bps=spreadbps,queue_ahead=qa,recent_delta=rd,recent_return_bps=rr)
     stats['signals']+=1
+    if route.mode=='MAKER': route.mode='REJECT'; route.reason='MAKER_QUEUE_NOT_SIMULATED_V2'
     if route.mode=='REJECT':
      stats['rejected']+=1;stats['reject_reasons'][route.reason]=stats['reject_reasons'].get(route.reason,0)+1
     else:
