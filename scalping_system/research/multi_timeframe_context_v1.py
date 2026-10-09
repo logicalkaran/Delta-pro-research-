@@ -1,68 +1,46 @@
-"""Multi-timeframe research context builder. Research/paper only.
-
-5m/15m/1h are contextual layers for scalping and swing research.
-They do not alter leverage, risk, execution, or production strategy.
-"""
+"""Multi-timeframe trend/volatility context for 1m/5m paper research; no execution."""
+from __future__ import annotations
+import argparse,json,math,time
 from pathlib import Path
-import json,time,statistics
 ROOT=Path(__file__).resolve().parents[1]
-SRC=ROOT/"data/live_candles.json"
-OUT=ROOT/"data/processed/multi_timeframe_context_v1.json"
-H={"5m":5,"15m":15,"1h":60}
+SRC=ROOT/'data/processed/live_multi_timeframe_candles_v1.json'
+OUT=ROOT/'data/processed/live_multi_timeframe_context_v1.json'
 
-def f(x,d=0):
-    try:return float(x)
-    except:return d
+def ema(vals,period):
+    if not vals:return None
+    a=2/(period+1); e=vals[0]
+    for x in vals[1:]:e=a*x+(1-a)*e
+    return e
 
-def ema(a,n):
-    if not a:return 0
-    x=a[0]; k=2/(n+1)
-    for v in a[1:]: x=k*v+(1-k)*x
-    return x
-
-def atr(c,n=14):
-    if len(c)<2:return 0
+def describe(rows):
+    if len(rows)<55:return {'status':'INSUFFICIENT_HISTORY','bars':len(rows),'direction':'UNKNOWN'}
+    closes=[float(x['close']) for x in rows]; highs=[float(x['high']) for x in rows]; lows=[float(x['low']) for x in rows]
+    e20=ema(closes[-120:],20); e50=ema(closes[-160:],50); c=closes[-1]
+    r5=(c/closes[-6]-1)*10000; r20=(c/closes[-21]-1)*10000; r50=(c/closes[-51]-1)*10000
     tr=[]
-    for i in range(1,len(c)):
-        h,l,pc=f(c[i]["high"]),f(c[i]["low"]),f(c[i-1]["close"])
-        tr.append(max(h-l,abs(h-pc),abs(l-pc)))
-    return statistics.mean(tr[-n:]) if tr else 0
+    for i in range(1,len(rows)):
+        tr.append(max(highs[i]-lows[i],abs(highs[i]-closes[i-1]),abs(lows[i]-closes[i-1])))
+    atr=sum(tr[-14:])/min(14,len(tr)) if tr else 0
+    atr_pct=atr/c*10000 if c else 0
+    direction='BULLISH' if c>e20>e50 and r20>0 else 'BEARISH' if c<e20<e50 and r20<0 else 'MIXED'
+    regime='HIGH_VOL' if atr_pct>25 else 'LOW_VOL' if atr_pct<6 else 'NORMAL_VOL'
+    return {'status':'OK','bars':len(rows),'last_ts':rows[-1]['timestamp'],'close':c,'ema20':e20,'ema50':e50,'return_5_bps':r5,'return_20_bps':r20,'return_50_bps':r50,'atr14_bps':atr_pct,'direction':direction,'volatility_regime':regime}
 
-def resample(c,minutes):
-    step=minutes*60; buckets={}
-    for x in c:
-        t=int(f(x.get("timestamp")))
-        b=t-(t%step)
-        z=buckets.setdefault(b,{"timestamp":b,"open":None,"high":-1e99,"low":1e99,"close":None,"volume":0,"trades":0})
-        o,h,l,cl=f(x.get("open")),f(x.get("high")),f(x.get("low")),f(x.get("close"))
-        if z["open"] is None:z["open"]=o
-        z["high"]=max(z["high"],h); z["low"]=min(z["low"],l); z["close"]=cl
-        z["volume"]+=f(x.get("volume")); z["trades"]+=int(f(x.get("trades")))
-    return [buckets[k] for k in sorted(buckets)]
-
-def context(c):
-    closes=[f(x["close"]) for x in c]
-    if len(closes)<30:return {"samples":len(c),"ready":False}
-    px=closes[-1]; e9=ema(closes[-30:],9); e21=ema(closes[-30:],21); a=atr(c)
-    r1=px/closes[-2]-1; r3=px/closes[-4]-1; r10=px/closes[-11]-1
-    trend="UP" if e9>e21 and r3>0 else ("DOWN" if e9<e21 and r3<0 else "MIXED")
-    vol=a/px if px else 0
-    regime="HIGH_VOL" if vol>.002 else ("LOW_VOL" if vol<.0007 else "NORMAL_VOL")
-    return {"samples":len(c),"ready":True,"price":px,"ema9":e9,"ema21":e21,
-            "return1":r1,"return3":r3,"return10":r10,"atr":a,"atr_pct":vol*100,
-            "trend":trend,"regime":regime}
+def build(cache):
+    frames=cache.get('candles',{})
+    ctx={k:describe(v) for k,v in frames.items()}
+    higher=[ctx.get(k,{}) for k in ('15m','1h','4h')]
+    dirs=[x.get('direction') for x in higher if x.get('status')=='OK']
+    bullish=dirs.count('BULLISH'); bearish=dirs.count('BEARISH')
+    alignment='BULLISH' if bullish>=2 and bearish==0 else 'BEARISH' if bearish>=2 and bullish==0 else 'MIXED'
+    return {'schema':'live_multi_timeframe_context_v1','updated_at_epoch':time.time(),'symbol':cache.get('symbol','BTCUSD'),'trade_horizons':['1m','5m'],'context_horizons':['15m','1h','4h'],'frames':ctx,'higher_timeframe_alignment':alignment,'policy':'CONTEXT_ONLY_NOT_AN_ENTRY_SIGNAL','research_only':True,'real_orders':False,'live_execution_enabled':False}
 
 def main():
-    raw=json.loads(SRC.read_text()) if SRC.exists() else []
-    out={"updated_at":time.time(),"status":"RESEARCH_ONLY","timeframes":{},"policy":{
-        "leverage_changed":False,"risk_changed":False,"production_mutation":False,"real_orders":False}}
-    for name,m in H.items():
-        c=resample(raw,m); out["timeframes"][name]=context(c)
-    # Cross-timeframe alignment is deliberately descriptive, not a trade signal.
-    cs=out["timeframes"]
-    trends=[cs[x].get("trend") for x in ("5m","15m","1h") if cs[x].get("ready")]
-    out["alignment"]="ALIGNED_UP" if trends and all(x=="UP" for x in trends) else ("ALIGNED_DOWN" if trends and all(x=="DOWN" for x in trends) else "MIXED")
-    OUT.write_text(json.dumps(out,indent=2))
-    print(json.dumps(out,indent=2))
-
-if __name__=="__main__":main()
+    p=argparse.ArgumentParser(); p.add_argument('--once',action='store_true'); p.add_argument('--interval',type=int,default=30); a=p.parse_args()
+    while True:
+        try:
+            cache=json.loads(SRC.read_text()); result=build(cache); tmp=OUT.with_suffix('.tmp'); tmp.write_text(json.dumps(result,indent=2)); tmp.replace(OUT); print(json.dumps({'status':'OK','alignment':result['higher_timeframe_alignment'],'frames':{k:{'direction':v.get('direction'),'regime':v.get('volatility_regime'),'bars':v.get('bars')} for k,v in result['frames'].items()},'real_orders':False}),flush=True)
+        except Exception as e:print(json.dumps({'status':'ERROR','error':type(e).__name__+': '+str(e)[:160],'real_orders':False}),flush=True)
+        if a.once:break
+        time.sleep(max(10,a.interval))
+if __name__=='__main__':main()
