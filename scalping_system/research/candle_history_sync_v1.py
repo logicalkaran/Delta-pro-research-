@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 BASE='https://api.india.delta.exchange'
 RESOLUTIONS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400}
+REFRESH_TTL={'1m':25,'5m':60,'15m':180,'1h':300,'4h':900}
 OUT=ROOT/'data/live_candles.json'
 MTF=ROOT/'data/processed/live_multi_timeframe_candles_v1.json'
 
@@ -37,19 +38,30 @@ def fetch(resolution:str, lookback_seconds:int, timeout:float=8.0):
     return [by_time[t] for t in sorted(by_time)]
 
 def refresh_once():
-    now=int(time.time()); frames={}; errors={}
+    now=int(time.time()); frames={}; errors={}; fetched_at={}
+    try: previous=json.loads(MTF.read_text()) if MTF.exists() else {}
+    except Exception: previous={}
+    old_frames=previous.get('candles',{}) if isinstance(previous,dict) else {}
+    old_fetched=previous.get('frame_fetched_at',{}) if isinstance(previous,dict) else {}
     for res,seconds in RESOLUTIONS.items():
-        lookback=12*3600 if res=='1m' else 14*86400
+        cached=old_frames.get(res,[])
+        last_fetch=float(old_fetched.get(res,0) or 0)
         try:
+            if len(cached)>=30 and now-last_fetch<REFRESH_TTL[res]:
+                frames[res]=cached; fetched_at[res]=last_fetch; continue
+            lookback=12*3600 if res=='1m' else 14*86400
             rows=fetch(res,lookback)
             if len(rows)<30: raise RuntimeError('too few valid candles: '+str(len(rows)))
-            frames[res]=rows[-2400:]
-        except Exception as e: errors[res]=type(e).__name__+': '+str(e)[:180]
+            frames[res]=rows[-2400:]; fetched_at[res]=time.time()
+        except Exception as e:
+            errors[res]=type(e).__name__+': '+str(e)[:180]
+            if len(cached)>=30:
+                frames[res]=cached; fetched_at[res]=last_fetch
     if '1m' not in frames: raise RuntimeError('1m refresh failed; existing cache preserved: '+str(errors.get('1m','unknown error')))
     one=frames['1m'][-240:]
     # Keep consumer-compatible live_candles.json as a plain chronological list.
     atomic_json(OUT,one)
-    result={'schema':'live_multi_timeframe_candles_v1','symbol':'BTCUSD','updated_at_epoch':time.time(),'source':'Delta public candle REST','research_only':True,'real_orders':False,'frames':{k:{'count':len(v),'first_ts':v[0]['timestamp'],'last_ts':v[-1]['timestamp'],'last_age_seconds':max(0,now-v[-1]['timestamp']-RESOLUTIONS[k])} for k,v in frames.items()},'errors':errors,'candles':frames}
+    result={'schema':'live_multi_timeframe_candles_v1','symbol':'BTCUSD','updated_at_epoch':time.time(),'frame_fetched_at':fetched_at,'source':'Delta public candle REST','research_only':True,'real_orders':False,'frames':{k:{'count':len(v),'first_ts':v[0]['timestamp'],'last_ts':v[-1]['timestamp'],'last_age_seconds':max(0,now-v[-1]['timestamp']-RESOLUTIONS[k]),'cache_age_seconds':round(max(0,time.time()-fetched_at.get(k,0)),2)} for k,v in frames.items()},'errors':errors,'candles':frames}
     atomic_json(MTF,result)
     return {'status':'OK' if not errors else 'PARTIAL','one_minute_count':len(one),'frames':result['frames'],'errors':errors,'live_candles_path':str(OUT.relative_to(ROOT)),'mtf_path':str(MTF.relative_to(ROOT)),'real_orders':False}
 
