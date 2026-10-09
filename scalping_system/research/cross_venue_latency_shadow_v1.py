@@ -14,7 +14,7 @@ import websocket
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'data/processed/cross_venue_latency_shadow_v1.json'
 LOG=ROOT/'data/processed/cross_venue_latency_shadow_v1.jsonl'
-DURATION_SECONDS=120
+DURATION_SECONDS=60
 MAX_ROWS=30000
 DELTA_URL='wss://public-socket.india.delta.exchange'
 BINANCE_URL='wss://stream.binance.com:9443/ws/btcusdt@depth5@100ms'
@@ -26,6 +26,13 @@ def n(x):
  except (TypeError,ValueError): return None
 
 def iso_now():return datetime.now(timezone.utc).isoformat()
+def parse_binance_quote(d):
+ bids=d.get('bids') or d.get('b') or []
+ asks=d.get('asks') or d.get('a') or []
+ if not bids or not asks:return None
+ event_ms=n(d.get('E')); event_ts=event_ms/1000 if event_ms else None
+ return event_ts,n(bids[0][0]),n(asks[0][0])
+
 def add(venue,recv,event_ts,bid,ask,raw_type):
  if bid is None or ask is None or bid<=0 or ask<bid:return
  row={'venue':venue,'receive_epoch':recv,'receive_utc':iso_now(),'exchange_event_ts':event_ts,'bid':bid,'ask':ask,'mid':(bid+ask)/2,'spread_bps':(ask-bid)/((ask+bid)/2)*10000,'type':raw_type}
@@ -73,10 +80,10 @@ def binance_worker():
     except websocket.WebSocketTimeoutException: continue
     recv=time.time()
     try:
-     d=json.loads(raw);bids=d.get('b',[]);asks=d.get('a',[])
-     if not bids or not asks:continue
-     event_ms=n(d.get('E')); event_ts=event_ms/1000 if event_ms else None
-     add('binance',recv,event_ts,n(bids[0][0]),n(asks[0][0]),'depth5@100ms')
+     d=json.loads(raw);quote=parse_binance_quote(d)
+     if quote is None:continue
+     event_ts,bid,ask=quote
+     add('binance',recv,event_ts,bid,ask,'depth5@100ms')
     except Exception:
      with LOCK: STATUS.setdefault('binance',{}).setdefault('parse_errors',0);STATUS['binance']['parse_errors']+=1
   except Exception as e:
