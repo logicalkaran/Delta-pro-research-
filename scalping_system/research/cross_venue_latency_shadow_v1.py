@@ -10,10 +10,12 @@ import json, math, statistics, threading, time
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 import websocket
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 from strategy.cross_venue_v41 import VenueSnapshot
 from strategy.cross_venue_edge_v42 import classify
-ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'data/processed/cross_venue_latency_shadow_v1.json'
 LOG=ROOT/'data/processed/cross_venue_latency_shadow_v1.jsonl'
 DURATION_SECONDS=30
