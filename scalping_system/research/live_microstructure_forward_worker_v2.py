@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 SRC=ROOT/'data/processed/live_microstructure_features_v1.jsonl'
 OUT=ROOT/'data/processed/live_microstructure_labeled_v2.jsonl'
+STATE=ROOT/'data/processed/live_microstructure_forward_worker_v2_state.json'
 MAX_BYTES=20_000_000
 HORIZONS=(60,120,180,300)
 
@@ -31,12 +32,12 @@ def prior_labels(path):
                 except (ValueError,TypeError,KeyError): pass
     return seen
 
-def label_ready(rows,seen):
+def label_ready(rows,after_ts):
     ts=[float(r['ts']) for r in rows]; mids=[float(r['mid']) for r in rows]
     out=[]
     for i,r in enumerate(rows):
         t=ts[i]
-        if t in seen: continue
+        if t<=after_ts: continue
         labels={}; ready=True
         for h in HORIZONS:
             j=bisect.bisect_left(ts,t+h,i+1)
@@ -44,7 +45,7 @@ def label_ready(rows,seen):
             labels[str(h)]={'future_ts':ts[j],'move_bps':(mids[j]/mids[i]-1)*10000}
         if ready:
             x=dict(r); x['labels']=labels; x['label_schema']='forward_mid_return_bps_v2'; x['research_only']=True; x['real_orders']=False
-            out.append(x); seen.add(t)
+            out.append(x)
     return out
 
 def append_bounded(path,records):
@@ -58,8 +59,17 @@ def append_bounded(path,records):
         tmp=path.with_suffix('.tmp'); tmp.write_text('\n'.join(keep)+'\n',encoding='utf-8'); tmp.replace(path)
 
 def run_once():
-    rows=read_rows(SRC); seen=prior_labels(OUT); prior_count=len(seen); labeled=label_ready(rows,seen); append_bounded(OUT,labeled)
-    return {'source_rows':len(rows),'previously_labeled_timestamps':prior_count,'new_labels':len(labeled),'total_seen_timestamps':len(seen),'last_source_ts':float(rows[-1]['ts']) if rows else None,'output_bytes':OUT.stat().st_size if OUT.exists() else 0,'research_only':True,'real_orders':False}
+    rows=read_rows(SRC)
+    try: state=json.loads(STATE.read_text()) if STATE.exists() else {}
+    except Exception: state={}
+    last=float(state.get('last_labeled_ts',0) or 0)
+    if not last and OUT.exists():
+        prior=prior_labels(OUT); last=max(prior) if prior else 0.0
+    labeled=label_ready(rows,last); append_bounded(OUT,labeled)
+    if labeled: last=max(float(r['ts']) for r in labeled)
+    STATE.parent.mkdir(parents=True,exist_ok=True)
+    tmp=STATE.with_suffix('.tmp'); tmp.write_text(json.dumps({'last_labeled_ts':last,'updated_at_epoch':time.time(),'last_source_ts':float(rows[-1]['ts']) if rows else None,'research_only':True,'real_orders':False})); tmp.replace(STATE)
+    return {'source_rows':len(rows),'last_labeled_ts':last,'new_labels':len(labeled),'last_source_ts':float(rows[-1]['ts']) if rows else None,'output_bytes':OUT.stat().st_size if OUT.exists() else 0,'research_only':True,'real_orders':False}
 
 def main():
     while True:
