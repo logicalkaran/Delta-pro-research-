@@ -13,7 +13,8 @@ import websocket
 
 ROOT=Path(__file__).resolve().parents[1]
 BASE=ROOT/'data/raw/cross_venue_aligned'
-BINANCE_WS='wss://fstream.binance.com/stream?streams=btcusdt@aggTrade/btcusdt@depth@100ms'
+BINANCE_WS='wss://fstream.binance.com/public/ws/btcusdt@depth@100ms'
+BINANCE_TRADE_WS='wss://fstream.binance.com/market/ws/btcusdt@aggTrade'
 BINANCE_DEPTH='https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=1000'
 BINANCE_INFO='https://fapi.binance.com/fapi/v1/exchangeInfo'
 DELTA_WS='wss://public-socket.india.delta.exchange'
@@ -59,13 +60,20 @@ def quote(venue,bid,ask,engine_ts,recv_wall,recv_mono,source):
   QUOTES[venue]=row;QUOTE_HISTORY[venue].append(row)
  return row
 
+def depth_snapshot_bridge(first_u,final_u,last_update_id):
+ return int(first_u)<=int(last_update_id)<=int(final_u)
+
+def depth_event_follows(previous_final_id,event_previous_id):
+ return event_previous_id is not None and int(event_previous_id)==int(previous_final_id)
+
 def nearest_quantile(values,q):
  if not values:return None
  a=sorted(values);return a[min(len(a)-1,max(0,math.ceil(q*len(a))-1))]
 
 def signed_flow(now_mono):
- while FLOW and now_mono-FLOW[0][0]>.5:FLOW.popleft()
- return sum(x[1] for x in FLOW)
+ with LOCK:
+  while FLOW and now_mono-FLOW[0][0]>.5:FLOW.popleft()
+  return sum(x[1] for x in FLOW)
 
 def maybe_sweep(now_mono,recv_wall,engine_ts,old_bid,old_ask,new_bid,new_ask):
  global LAST_FLOW_SAMPLE,LAST_THRESHOLD_REFRESH,LAST_FLOW_THRESHOLD
@@ -132,10 +140,12 @@ def binance_worker():
     if s.get('symbol')=='BTCUSDT':
      for flt in s.get('filters',[]):
       if flt.get('filterType')=='PRICE_FILTER':TICK_SIZE=float(flt['tickSize'])
-   with urllib.request.urlopen(BINANCE_DEPTH,timeout=8) as r:snap=json.loads(r.read().decode())
-   bids={float(p):float(q) for p,q in snap['bids']};asks={float(p):float(q) for p,q in snap['asks']};last_id=int(snap['lastUpdateId']);synced=False
+   # Start the stream before snapshot fetch so depth events buffer while REST snapshot loads.
    ws=websocket.create_connection(BINANCE_WS,timeout=8,enable_multithread=True);ws.settimeout(2)
    with LOCK:STATUS['binance']='connected_waiting_for_depth_sync'
+   with urllib.request.urlopen(BINANCE_DEPTH,timeout=8) as r:snap=json.loads(r.read().decode())
+   bids={float(p):float(q) for p,q in snap['bids']};asks={float(p):float(q) for p,q in snap['asks']};last_id=int(snap['lastUpdateId']);synced=False
+   previous_u=None
    while not STOP.is_set():
     try:raw=ws.recv()
     except websocket.WebSocketTimeoutException:continue
@@ -152,12 +162,13 @@ def binance_worker():
      U=int(d['U']);u=int(d['u'])
      if u<=last_id:continue
      if not synced:
-      if not (U<=last_id+1<=u):
-       # Snapshot-to-stream sequence gap: resync instead of using a broken book.
+      if u<last_id:continue
+      if not depth_snapshot_bridge(U,u,last_id):
+       # Futures snapshot bridge failed: resync rather than calculate on a broken book.
        with LOCK:COUNTS['sequence_gaps']+=1;STATUS['binance']='depth_sequence_gap_resnapshot'
        ws.close();ws=None;break
       synced=True
-     elif U>last_id+1:
+     elif not depth_event_follows(previous_u,d.get('pu')):
       with LOCK:COUNTS['sequence_gaps']+=1;STATUS['binance']='depth_sequence_gap_resnapshot'
       ws.close();ws=None;break
      old_bid=max(bids) if bids else None;old_ask=min(asks) if asks else None
@@ -169,7 +180,7 @@ def binance_worker():
       p=float(p);q=float(q)
       if q==0:asks.pop(p,None)
       else:asks[p]=q
-     last_id=u;best_bid=max(bids) if bids else None;best_ask=min(asks) if asks else None
+     last_id=u;previous_u=u;best_bid=max(bids) if bids else None;best_ask=min(asks) if asks else None
      if best_bid is None or best_ask is None:continue
      q=quote('binance',best_bid,best_ask,d.get('T') or d.get('E'),recv_wall,recv_mono,'depthUpdate')
      if q is None:continue
@@ -180,6 +191,34 @@ def binance_worker():
      with LOCK:COUNTS['bad_rows']+=1
   except Exception as e:
    with LOCK:STATUS['binance']='error:'+type(e).__name__
+   time.sleep(1)
+  finally:
+   try:
+    if ws:ws.close()
+   except Exception:pass
+
+def binance_trade_worker():
+ while not STOP.is_set():
+  ws=None
+  try:
+   ws=websocket.create_connection(BINANCE_TRADE_WS,timeout=8,enable_multithread=True);ws.settimeout(2)
+   with LOCK:STATUS['binance_trades']='connected'
+   while not STOP.is_set():
+    try:raw=ws.recv()
+    except websocket.WebSocketTimeoutException:continue
+    recv_wall=time.time();recv_mono=time.monotonic()
+    try:
+     d=json.loads(raw)
+     if d.get('e')!='aggTrade':continue
+     price=num(d.get('p'));qty=num(d.get('q'));maker=d.get('m')
+     if price is None or qty is None or maker is None:continue
+     side=-1 if maker else 1
+     with LOCK:FLOW.append((recv_mono,side*qty));COUNTS['binance_aggTrade']+=1;STATUS['binance_trades']='connected'
+     emit_raw({'venue':'binance','kind':'aggTrade','symbol':'BTCUSDT','engine_event_ts_s':ts_seconds(d.get('E')),'engine_transaction_ts_s':ts_seconds(d.get('T')),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'trade_id':d.get('a'),'price':price,'quantity_btc':qty,'aggressor_side':'SELL' if maker else 'BUY','buyer_is_maker':maker,'book_synced':STATUS.get('binance')=='connected_synced'})
+    except Exception:
+     with LOCK:COUNTS['bad_rows']+=1
+  except Exception as e:
+   with LOCK:STATUS['binance_trades']='error:'+type(e).__name__
    time.sleep(1)
   finally:
    try:
@@ -233,7 +272,7 @@ def main():
  BASE.mkdir(parents=True,exist_ok=True);stamp=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
  OUT_RAW=BASE/f'cross_venue_ticks_{stamp}.jsonl';OUT_SWEEPS=BASE/f'cross_venue_sweeps_{stamp}.jsonl';OUT_LABELS=BASE/f'cross_venue_labels_{stamp}.jsonl'
  with OUT_RAW.open('a',encoding='utf-8',buffering=1) as RAW_F, OUT_SWEEPS.open('a',encoding='utf-8',buffering=1) as SWEEP_F, OUT_LABELS.open('a',encoding='utf-8',buffering=1) as LABEL_F:
-  threads=[threading.Thread(target=binance_worker,daemon=True),threading.Thread(target=delta_worker,daemon=True)]
+  threads=[threading.Thread(target=binance_worker,daemon=True),threading.Thread(target=binance_trade_worker,daemon=True),threading.Thread(target=delta_worker,daemon=True)]
   for t in threads:t.start()
   start=time.monotonic();last_flush=start
   try:
