@@ -14,6 +14,11 @@ class CrossVenueShadowTests(unittest.TestCase):
  def test_binance_partial_depth_payload_schema(self):
   q=parse_binance_quote({'lastUpdateId':1,'bids':[['100.0','3.0']],'asks':[['101.0','4.0']]})
   self.assertEqual(q,(None,100.0,101.0))
+ def test_v42_classifier_runs_without_enabling_execution(self):
+  add('binance',1000,None,100,101,'test');add('delta_india',1000.01,None,100.1,101.1,'test')
+  r=summarize();self.assertIsNotNone(r['cross_venue_edge_v42_dry_run'])
+  self.assertIn(r['cross_venue_edge_v42_dry_run']['state'],{'VENUE_CONFIRMATION','MILD_DIVERGENCE','DIVERGENCE'})
+  self.assertFalse(r['real_orders'])
  def test_invalid_quotes_ignored(self):
   add('binance',1000,None,0,1,'test')
   with LOCK:self.assertEqual(len(EVENTS),0)

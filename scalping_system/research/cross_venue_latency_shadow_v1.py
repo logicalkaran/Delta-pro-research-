@@ -11,10 +11,12 @@ from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 import websocket
+from strategy.cross_venue_v41 import VenueSnapshot
+from strategy.cross_venue_edge_v42 import classify
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'data/processed/cross_venue_latency_shadow_v1.json'
 LOG=ROOT/'data/processed/cross_venue_latency_shadow_v1.jsonl'
-DURATION_SECONDS=60
+DURATION_SECONDS=30
 MAX_ROWS=30000
 DELTA_URL='wss://public-socket.india.delta.exchange'
 BINANCE_URL='wss://stream.binance.com:9443/ws/btcusdt@depth5@100ms'
@@ -100,7 +102,13 @@ def pct(vals,p):
  return a[i]+(a[j]-a[i])*(x-i)
 def summarize():
  with LOCK: rows=list(EVENTS); status=json.loads(json.dumps(STATUS))
- result={'schema':'cross_venue_latency_shadow_v1','generated_at':iso_now(),'duration_seconds':DURATION_SECONDS,'mode':'PUBLIC_WEBSOCKET_DRY_RUN','real_orders':False,'private_api':False,'exchange_mutations':False,'credentials_used':False,'venue_status':status,'event_counts':{},'clock_quality':{},'arrival_lag':{},'lead_lag_diagnostics':{},'limitations':[]}
+ latest_by_venue={}
+ for row in rows: latest_by_venue[row['venue']]=row
+ v42=None
+ if 'binance' in latest_by_venue and 'delta_india' in latest_by_venue:
+  a=latest_by_venue['binance'];b=latest_by_venue['delta_india']
+  v42=classify([VenueSnapshot('binance_BTCUSDT',a['mid'],a['bid'],a['ask']),VenueSnapshot('delta_india_BTCUSD',b['mid'],b['bid'],b['ask'])])
+ result={'schema':'cross_venue_latency_shadow_v1','generated_at':iso_now(),'duration_seconds':DURATION_SECONDS,'mode':'PUBLIC_WEBSOCKET_DRY_RUN','real_orders':False,'private_api':False,'exchange_mutations':False,'credentials_used':False,'venue_status':status,'event_counts':{},'latest_quotes':{k:{key:v.get(key) for key in ('receive_epoch','receive_utc','bid','ask','mid','spread_bps','exchange_event_ts')} for k,v in latest_by_venue.items()},'cross_venue_edge_v42_dry_run':v42,'classifier_semantics':'V4.2 compares contemporaneous relative premiums around the mean reference price; it does not infer temporal leader/lagger propagation and does not authorize an order.','event_counts':{},'clock_quality':{},'arrival_lag':{},'lead_lag_diagnostics':{},'limitations':[]}
  for venue in ('binance','delta_india'):
   rr=[r for r in rows if r['venue']==venue]; result['event_counts'][venue]=len(rr)
   gaps=[(b['receive_epoch']-a['receive_epoch'])*1000 for a,b in zip(rr,rr[1:])]
@@ -129,7 +137,7 @@ def summarize():
   corr=sum((u-mb)*(v-md) for u,v in zip(bm,dm))/den if den else None
  else:corr=None
  result['lead_lag_diagnostics']={'paired_return_samples':len(moves),'contemporaneous_return_correlation':corr,'predictive_lead_lag_test':'NOT_ESTABLISHED','cross_venue_symbols_not_identical':True,'contract_basis_not_adjusted':True}
- result['limitations']=['No private order acknowledgement or execution latency measured','Binance BTCUSDT spot-like book and Delta BTCUSD perpetual are different instruments; basis and contract mechanics are not normalized','Exchange timestamps and local clock synchronization are unverified','Nearest arrival pairing is descriptive and cannot prove Binance leads Delta','Two-minute probe is not enough for predictive validation','No live execution, order API, credentials, leverage or account endpoint used']
+ result['limitations']=['No private order acknowledgement or execution latency measured','Binance BTCUSDT spot-like book and Delta BTCUSD perpetual are different instruments; basis and contract mechanics are not normalized','Exchange timestamps and local clock synchronization are unverified','Nearest arrival pairing is descriptive and cannot prove Binance leads Delta','Short probe is not enough for predictive validation','No live execution, order API, credentials, leverage or account endpoint used']
  return result
 
 def main():
