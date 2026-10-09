@@ -28,7 +28,7 @@ FLOW_BASELINE_MAX=18000
 STOP=threading.Event(); LOCK=threading.RLock()
 QUOTES={'binance':None,'delta':None}
 QUOTE_HISTORY={'binance':deque(maxlen=BUFFER_MAX),'delta':deque(maxlen=BUFFER_MAX)}
-FLOW=deque()  # (monotonic, signed BTC quantity)
+FLOW=deque()  # (monotonic, signed BTC quantity, trade price)
 FLOW_BASELINE=deque(maxlen=FLOW_BASELINE_MAX)
 LAST_FLOW_SAMPLE=0.0; LAST_THRESHOLD_REFRESH=0.0; LAST_FLOW_THRESHOLD=None
 PENDING=[]
@@ -75,6 +75,12 @@ def signed_flow(now_mono):
   while FLOW and now_mono-FLOW[0][0]>.5:FLOW.popleft()
   return sum(x[1] for x in FLOW)
 
+def count_swept_trade_levels(direction,old_best,new_best,now_mono):
+ with LOCK: trades=[x for x in FLOW if now_mono-x[0]<=FLOW_WINDOW_S]
+ if direction>0: prices=[x[2] for x in trades if x[1]>0 and old_best<=x[2]<new_best]
+ else: prices=[x[2] for x in trades if x[1]<0 and new_best<x[2]<=old_best]
+ return len({int(round(p/TICK_SIZE)) for p in prices})
+
 def maybe_sweep(now_mono,recv_wall,engine_ts,old_bid,old_ask,new_bid,new_ask):
  global LAST_FLOW_SAMPLE,LAST_THRESHOLD_REFRESH,LAST_FLOW_THRESHOLD
  # Sample 500ms signed trade flow at most every 100ms, for an adaptive threshold.
@@ -87,10 +93,12 @@ def maybe_sweep(now_mono,recv_wall,engine_ts,old_bid,old_ask,new_bid,new_ask):
  # Ask lifting implies buy sweep; bid dropping implies sell sweep.
  up=max(0,int(round((new_ask-old_ask)/TICK_SIZE)))
  down=max(0,int(round((old_bid-new_bid)/TICK_SIZE)))
- direction=1 if up>=SWEEP_LEVELS and signed>0 else -1 if down>=SWEEP_LEVELS and signed<0 else 0
+ buy_levels=count_swept_trade_levels(1,old_ask,new_ask,now_mono) if up>=SWEEP_LEVELS and signed>0 else 0
+ sell_levels=count_swept_trade_levels(-1,old_bid,new_bid,now_mono) if down>=SWEEP_LEVELS and signed<0 else 0
+ direction=1 if up>=SWEEP_LEVELS and signed>0 and buy_levels>=SWEEP_LEVELS else -1 if down>=SWEEP_LEVELS and signed<0 and sell_levels>=SWEEP_LEVELS else 0
  if not direction:return
  if LAST_FLOW_THRESHOLD is None or abs(signed)<LAST_FLOW_THRESHOLD:return
- event={'schema':'cross_venue_sweep_candidate_v1','candidate_id':f'{int(recv_wall*1e6)}-{COUNTS["sweep_candidates"]+1}','direction':direction,'direction_text':'BUY' if direction>0 else 'SELL','engine_ts_s':ts_seconds(engine_ts),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':now_mono,'signed_flow_500ms':signed,'rolling_abs_flow_p99':LAST_FLOW_THRESHOLD,'cleared_price_levels_estimate':up if direction>0 else down,'tick_size':TICK_SIZE,'binance_best_bid':new_bid,'binance_best_ask':new_ask,'research_only':True,'real_orders':False,'definition':'500ms signed aggTrade volume exceeds rolling 99th percentile and best ask rises / best bid falls by at least 3 ticks; candidate only, not proof of a sweep or executable fill'}
+ event={'schema':'cross_venue_sweep_candidate_v1','candidate_id':f'{int(recv_wall*1e6)}-{COUNTS["sweep_candidates"]+1}','direction':direction,'direction_text':'BUY' if direction>0 else 'SELL','engine_ts_s':ts_seconds(engine_ts),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':now_mono,'signed_flow_500ms':signed,'rolling_abs_flow_p99':LAST_FLOW_THRESHOLD,'best_price_ticks_moved':up if direction>0 else down,'executed_trade_price_levels_500ms':buy_levels if direction>0 else sell_levels,'tick_size':TICK_SIZE,'binance_best_bid':new_bid,'binance_best_ask':new_ask,'research_only':True,'real_orders':False,'definition':'500ms signed aggTrade volume exceeds rolling 99th percentile; best ask rises / best bid falls by at least 3 ticks; and at least 3 distinct aggressive-trade price levels were observed in the traversed interval. Still a candidate, not proof of no cancellations or executable fill'}
  with LOCK:
   COUNTS['sweep_candidates']+=1;write_row(SWEEP_F,event);PENDING.append({'event':event,'due_mono':now_mono+1.0,'base':None,'targets':{5:None,15:None,30:None}})
 
@@ -155,7 +163,7 @@ def binance_worker():
      if kind=='aggTrade':
       price=num(d.get('p'));qty=num(d.get('q'));maker=d.get('m');side=-1 if maker else 1
       if price is None or qty is None:continue
-      with LOCK:FLOW.append((recv_mono,side*qty));COUNTS['binance_aggTrade']+=1
+      with LOCK:FLOW.append((recv_mono,side*qty,price));COUNTS['binance_aggTrade']+=1
       row={'venue':'binance','kind':'aggTrade','symbol':'BTCUSDT','engine_event_ts_s':ts_seconds(d.get('E')),'engine_transaction_ts_s':ts_seconds(d.get('T')),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'trade_id':d.get('a'),'price':price,'quantity_btc':qty,'aggressor_side':'SELL' if maker else 'BUY','buyer_is_maker':maker,'book_synced':synced}
       emit_raw(row);continue
      if kind!='depthUpdate':continue
@@ -213,7 +221,7 @@ def binance_trade_worker():
      price=num(d.get('p'));qty=num(d.get('q'));maker=d.get('m')
      if price is None or qty is None or maker is None:continue
      side=-1 if maker else 1
-     with LOCK:FLOW.append((recv_mono,side*qty));COUNTS['binance_aggTrade']+=1;STATUS['binance_trades']='connected'
+     with LOCK:FLOW.append((recv_mono,side*qty,price));COUNTS['binance_aggTrade']+=1;STATUS['binance_trades']='connected'
      emit_raw({'venue':'binance','kind':'aggTrade','symbol':'BTCUSDT','engine_event_ts_s':ts_seconds(d.get('E')),'engine_transaction_ts_s':ts_seconds(d.get('T')),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'trade_id':d.get('a'),'price':price,'quantity_btc':qty,'aggressor_side':'SELL' if maker else 'BUY','buyer_is_maker':maker,'book_synced':STATUS.get('binance')=='connected_synced'})
     except Exception:
      with LOCK:COUNTS['bad_rows']+=1
@@ -294,6 +302,6 @@ def main():
    STOP.set()
    for t in threads:t.join(timeout=3)
    RAW_F.flush();SWEEP_F.flush();LABEL_F.flush()
- report={'schema':'cross_venue_aligned_capture_report_v1','started_at_utc':stamp,'finished_at_utc':now_iso(),'duration_requested_seconds':args.duration_seconds,'mode':'PUBLIC_RESEARCH_CAPTURE_ONLY','post_capture_label_drain_max_seconds':32,'binance_symbol':'BTCUSDT USD-M perpetual','delta_symbol':SYMBOL+' Delta India perpetual','raw_path':str(OUT_RAW.relative_to(ROOT)),'sweeps_path':str(OUT_SWEEPS.relative_to(ROOT)),'labels_path':str(OUT_LABELS.relative_to(ROOT)),'counts':COUNTS,'status':STATUS,'tick_size':TICK_SIZE,'buffers':{'per_venue_quote_history_max':BUFFER_MAX,'trade_flow_window_seconds':FLOW_WINDOW_S,'flow_baseline_max_samples':FLOW_BASELINE_MAX},'sweep_rule':{'window_seconds':FLOW_WINDOW_S,'flow_quantile':FLOW_QUANTILE,'minimum_baseline_samples':FLOW_MIN_SAMPLES,'levels':SWEEP_LEVELS,'buffer_seconds':1,'horizons_seconds':[5,15,30]},'timestamp_policy':'Preserve engine event/transaction timestamps and local receive wall/monotonic times separately. Cross-venue engine clocks are not assumed synchronized. Outcomes are receive-time actionable labels after a 1s buffer.','real_orders':False,'private_api':False,'credentials_used':False,'execution_enabled':False,'qwen_enabled':False,'notes':['Binance book only becomes eligible after diff-depth sequence synchronization.','Sweep candidates are observational and not proof of passive fill or profitable transmission.','Delta trade size is preserved as exchange contract units, not assumed BTC.','Depth/top-of-book units and contract multiplier require explicit instrument-spec verification before economic interpretation.']}
+ report={'schema':'cross_venue_aligned_capture_report_v1','started_at_utc':stamp,'finished_at_utc':now_iso(),'duration_requested_seconds':args.duration_seconds,'mode':'PUBLIC_RESEARCH_CAPTURE_ONLY','post_capture_label_drain_max_seconds':32,'binance_symbol':'BTCUSDT USD-M perpetual','delta_symbol':SYMBOL+' Delta India perpetual','raw_path':str(OUT_RAW.relative_to(ROOT)),'sweeps_path':str(OUT_SWEEPS.relative_to(ROOT)),'labels_path':str(OUT_LABELS.relative_to(ROOT)),'counts':COUNTS,'status':STATUS,'tick_size':TICK_SIZE,'buffers':{'per_venue_quote_history_max':BUFFER_MAX,'trade_flow_window_seconds':FLOW_WINDOW_S,'flow_baseline_max_samples':FLOW_BASELINE_MAX},'sweep_rule':{'window_seconds':FLOW_WINDOW_S,'flow_quantile':FLOW_QUANTILE,'minimum_baseline_samples':FLOW_MIN_SAMPLES,'levels':SWEEP_LEVELS,'requires_distinct_aggressive_trade_prices':3,'buffer_seconds':1,'horizons_seconds':[5,15,30]},'timestamp_policy':'Preserve engine event/transaction timestamps and local receive wall/monotonic times separately. Cross-venue engine clocks are not assumed synchronized. Outcomes are receive-time actionable labels after a 1s buffer.','real_orders':False,'private_api':False,'credentials_used':False,'execution_enabled':False,'qwen_enabled':False,'notes':['Binance book only becomes eligible after diff-depth sequence synchronization.','Sweep candidates are observational and not proof of passive fill or profitable transmission.','Delta trade size is preserved as exchange contract units, not assumed BTC.','Depth/top-of-book units and contract multiplier require explicit instrument-spec verification before economic interpretation.']}
  report_path=BASE/f'cross_venue_capture_report_{stamp}.json';report_path.write_text(json.dumps(report,indent=2,allow_nan=False));print(json.dumps(report,indent=2),flush=True)
 if __name__=='__main__':main()
