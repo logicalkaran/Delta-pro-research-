@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = ROOT / 'data/raw/delta_btc_raw.jsonl'
 DEFAULT_ARCHIVE_DIR = ROOT / 'data/raw/session_archive'
-RECEIVE_FIELDS = ('received_at','receive_time','received_ts','receive_ts','recv_ts','local_timestamp','local_ts')
+RECEIVE_FIELDS = ('receive_at','received_at','receive_time','received_ts','receive_ts','recv_ts','local_timestamp','local_ts')
 class SnapshotError(RuntimeError): pass
 
 def _hash(path):

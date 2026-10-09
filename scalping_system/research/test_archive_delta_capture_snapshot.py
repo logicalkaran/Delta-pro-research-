@@ -8,6 +8,11 @@ class Tests(unittest.TestCase):
  def test_hash_metadata_source_unchanged_and_bad_lines(self):
   data=b'{"received_at":1791555832.1,"ts":123}\nnot-json\n{"receive_ts":1791555833.2}\n'; self.src.write_bytes(data)
   dest,mp,m=archive_snapshot(self.src,self.out); self.assertEqual(dest.read_bytes(),data); self.assertEqual(self.src.read_bytes(),data); self.assertEqual(m['sha256'],hashlib.sha256(data).hexdigest()); self.assertEqual(m['line_count'],3); self.assertEqual(m['malformed_json_lines'],1); self.assertEqual(m['first_receive_timestamp_epoch_seconds'],'1791555832.1'); self.assertTrue(json.loads(mp.read_text())['research_only'])
+ def test_receive_at_iso_timestamp_is_detected(self):
+  self.src.write_text('{\"receive_at\":\"2026-10-09T16:40:00+00:00\"}\n')
+  _,_,m=archive_snapshot(self.src,self.out)
+  self.assertEqual(m['first_receive_timestamp_epoch_seconds'],'1791564000.0')
+  self.assertEqual(m['last_receive_timestamp_epoch_seconds'],'1791564000.0')
  def test_collision_never_overwrites(self):
   self.src.write_text('{"received_at":1}\n'); a,_,_=archive_snapshot(self.src,self.out); b,_,_=archive_snapshot(self.src,self.out); self.assertNotEqual(a,b); self.assertTrue(a.exists())
  def test_missing_and_empty(self):
