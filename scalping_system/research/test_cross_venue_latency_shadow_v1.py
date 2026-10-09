@@ -1,0 +1,17 @@
+import unittest
+from research.cross_venue_latency_shadow_v1 import summarize, add, EVENTS, STATUS, LOCK
+
+class CrossVenueShadowTests(unittest.TestCase):
+ def setUp(self):
+  with LOCK: EVENTS.clear(); STATUS.clear()
+ def test_summary_is_explicitly_dry_run(self):
+  r=summarize();self.assertFalse(r['real_orders']);self.assertFalse(r['private_api']);self.assertFalse(r['credentials_used'])
+ def test_arrival_lag_sign_convention(self):
+  t=1000.0
+  add('binance',t,None,100,101,'test');add('delta_india',t+.02,None,100,101,'test')
+  r=summarize();self.assertEqual(r['arrival_lag']['nearest_pairs_within_250ms'],1)
+  self.assertAlmostEqual(r['arrival_lag']['delta_receive_minus_binance_receive_ms_p50'],20,places=4)
+ def test_invalid_quotes_ignored(self):
+  add('binance',1000,None,0,1,'test')
+  with LOCK:self.assertEqual(len(EVENTS),0)
+if __name__=='__main__':unittest.main()
