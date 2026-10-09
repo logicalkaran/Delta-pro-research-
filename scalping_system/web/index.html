@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080c11">
+<meta name="description" content="BTC Trading OS paper-first control plane">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="stylesheet" href="/app.css">
+<title>BTC Trading OS</title>
+</head>
+<body>
+<header><div><b>₿ BTC TRADING OS</b><small>PAPER-FIRST CONTROL PLANE</small></div><span id="health">CONNECTING</span></header>
+<main>
+<section class="metrics">
+<article>BTCUSD<strong id="price">—</strong><small id="marketAge">—</small></article>
+<article>SPREAD<strong id="spread">—</strong><small>BID / ASK <span id="ba">—</span></small></article>
+<article>REGIME<strong id="regime">—</strong><small>microstructure</small></article>
+<article>DECISION<strong id="decision">WAIT</strong><small id="confidence">confidence —</small></article>
+<article>LIVE EXECUTION<strong class="safe" id="liveMode">LOCKED</strong><small>real orders disabled</small></article>
+</section>
+
+<section class="workspace">
+<div class="panel chartPanel">
+<div class="head"><b>BTC / USD · LIVE MARKET</b><span id="candleInfo">—</span></div>
+<canvas id="chart"></canvas>
+</div>
+<aside>
+<div class="panel">
+<div class="head"><b>Predictive S/R</b><span id="levelRegime">—</span></div>
+<div class="level"><span>Nearest support</span><strong id="support">—</strong></div>
+<div class="level"><span>Nearest resistance</span><strong id="resistance">—</strong></div>
+<div class="level"><span>POC / HVN</span><strong id="poc">—</strong></div>
+<div class="level"><span>Value area</span><strong id="valueArea">—</strong></div>
+</div>
+<div class="panel">
+<div class="head"><b>Order Book</b><i>LIVE</i></div>
+<div class="level"><span>Bid depth L5</span><strong id="bidDepth">—</strong></div>
+<div class="level"><span>Ask depth L5</span><strong id="askDepth">—</strong></div>
+<div class="level"><span>Imbalance L5</span><strong id="obi5">—</strong></div>
+<div class="level"><span>Imbalance L10</span><strong id="obi10">—</strong></div>
+</div>
+<div class="panel">
+<div class="head"><b>Safety Gate</b></div>
+<div id="gate" class="gate">Checking…</div>
+<p class="muted">Dashboard is read-only. Risk and live-execution gates remain outside the UI.</p>
+</div>
+</aside>
+</section>
+
+<section class="grid2">
+<div class="panel">
+<div class="head"><b>Flow & Microstructure</b><span id="flowSide">—</span></div>
+<div class="metrics compact">
+<article>5s DELTA<strong id="delta5">—</strong></article>
+<article>30s DELTA<strong id="delta30">—</strong></article>
+<article>60s DELTA<strong id="delta60">—</strong></article>
+<article>CVD<strong id="cvd">—</strong></article>
+<article>5s RETURN<strong id="ret5">—</strong></article>
+<article>AVG TRADE<strong id="avgTrade">—</strong></article>
+</div>
+</div>
+<div class="panel">
+<div class="head"><b>Paper Engine V3</b><span id="paperStatus">—</span></div>
+<div class="metrics compact">
+<article>TRADES<strong id="trades">—</strong></article>
+<article>WIN RATE<strong id="winRate">—</strong></article>
+<article>EXPECTANCY<strong id="expectancy">—</strong></article>
+<article>PROFIT FACTOR<strong id="pf">—</strong></article>
+<article>NET USD<strong id="netUsd">—</strong></article>
+<article>LEVEL BLOCKS<strong id="levelBlocks">—</strong></article>
+</div>
+</div>
+</section>
+
+<section class="grid2">
+<div class="panel">
+<div class="head"><b>Monthly Fisher</b><span>FROZEN PARAMETERS</span></div>
+<div class="level"><span>Fisher</span><strong id="fv">—</strong></div>
+<div class="level"><span>Trigger</span><strong id="tv">—</strong></div>
+<div class="level"><span>Bullish cross</span><strong id="fc">—</strong></div>
+<div class="muted">HL2 · length 10 · α 0.33 · β 0.67</div>
+</div>
+<div class="panel">
+<div class="head"><b>System</b><span id="updated">—</span></div>
+<div id="system" class="muted">Loading…</div>
+<div class="chips"><span>REAL ORDERS OFF</span><span>PAPER ONLY</span><span>RISK REQUIRED</span><span>AUDIT READY</span></div>
+</div>
+</section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

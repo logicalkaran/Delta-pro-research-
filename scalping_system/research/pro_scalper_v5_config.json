@@ -1,0 +1,63 @@
+{
+  "schema": "pro_scalper_v5_config",
+  "research_only": true,
+  "real_orders": false,
+  "paper_notional_usd": 100.0,
+  "max_fresh_seconds": 2.0,
+  "max_spread_bps": 4.0,
+  "max_short_volatility_bps": 35.0,
+  "min_samples_5s": 3,
+  "min_score": 4.0,
+  "min_net_edge_bps": 1.0,
+  "max_hold_seconds": 90,
+  "paper_target_bps": 20.0,
+  "paper_stop_bps": 10.0,
+  "maker_queue_fraction": 0.5,
+  "maker_fill_probability": 0.35,
+  "maker_adverse_selection_bps": 1.5,
+  "taker_slippage_bps": 1.0,
+  "funding_interval_seconds": 28800,
+  "market": {
+    "venue": "Delta Exchange India",
+    "symbol": "BTCUSD",
+    "lot_size_btc": 0.001,
+    "tick_size_usd": 0.5,
+    "maker_fee_bps_per_side": 2.36,
+    "taker_fee_bps_per_side": 5.9,
+    "gst_on_fees": 0.18,
+    "standard_fees_only": true,
+    "metadata_source_url": "https://www.delta.exchange/fees",
+    "retrieved_date": "2026-10-09",
+    "metadata_note": "Fee and contract assumptions supplied as verified by user; URLs and date recorded for provenance. No web retrieval was performed in this implementation.",
+    "maker_fee_bps_pre_gst": 2.0,
+    "taker_fee_bps_pre_gst": 5.0,
+    "funding_interval_hours": 8,
+    "metadata_source_urls": [
+      "https://prod-mobile-india.delta.exchange/contracts",
+      "https://prod-landing-page.delta.exchange/fees"
+    ]
+  },
+  "mode": "RESEARCH_ONLY",
+  "production_mutation": false,
+  "fee_policy": "standard fees only; no promotional discount; 18% GST on trading fees",
+  "maker_fee_bps_after_gst": 2.36,
+  "taker_fee_bps_after_gst": 5.9,
+  "funding_missing_policy": "0 funding assumed and explicitly annotated UNKNOWN_UNAVAILABLE_ZERO_ASSUMED",
+  "sources": [
+    {
+      "url": "https://prod-mobile-india.delta.exchange/contracts",
+      "retrieved": "2026-10-09",
+      "supports": "BTCUSD 0.001 BTC lot, USD 0.50 tick, maker/taker fees and 8 hour funding interval"
+    },
+    {
+      "url": "https://prod-landing-page.delta.exchange/fees",
+      "retrieved": "2026-10-09",
+      "supports": "standard fee schedule and 18% GST on trading fees"
+    }
+  ],
+  "slippage_bps_per_side": 1.0,
+  "adverse_selection_bps_per_side": 1.5,
+  "cost_floor_bps": 16.0,
+  "latency_ms": 250,
+  "maker_fill_requires_trade_through": true
+}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BTCUSD | Professional Market Intelligence</title>
+<style>
+:root{--bg:#070b10;--panel:#0d141c;--panel2:#101923;--line:#1c2936;--text:#e8eef5;--muted:#7f8d9d;--green:#42d392;--red:#ff6474;--amber:#f4c95d;--blue:#69a7ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#111d2a 0,#070b10 42%);color:var(--text);font:13px system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:1500px;margin:auto;padding:16px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.brand{font-size:20px;font-weight:750;letter-spacing:.2px}.sub{color:var(--muted);font-size:11px;margin-top:3px}.live{border:1px solid #28563f;background:#0d2118;color:var(--green);padding:6px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:9px}.card{background:rgba(14,21,30,.94);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 6px 22px #0003}.label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.7px}.value{font-size:19px;font-weight:750;margin-top:5px}.small{font-size:11px;color:var(--muted);margin-top:4px}.section{margin-top:10px}.section h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#aebaca;margin:0 0 8px}.wide{grid-column:span 3}.full{grid-column:1/-1}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.metric{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1b2632}.metric:last-child{border-bottom:0}.pill{display:inline-block;padding:4px 7px;border:1px solid var(--line);border-radius:999px;margin:2px 3px 2px 0;background:#111a24;font-size:11px}.good{color:var(--green)}.bad{color:var(--red)}.warn{color:var(--amber)}.blue{color:var(--blue)}ul{margin:5px 0;padding-left:19px}li{margin:6px 0}.bar{height:8px;background:#1b2632;border-radius:99px;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--blue);width:50%}.chartbox{padding:8px 0}.charttools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.chartbtn{min-height:40px;padding:8px 12px;border:1px solid var(--line);background:#101923;color:var(--muted);border-radius:9px;font-weight:700}.chartbtn.active{color:var(--text);border-color:#4b6f94;background:#182637}.chartwrap{position:relative;overflow:hidden;border:1px solid #1d2a37;border-radius:10px;background:#091018}.chartwrap svg{display:block;width:100%;height:280px}.chartinfo{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:7px}.footer{color:var(--muted);font-size:10px;margin-top:12px;text-align:center}
+@media(max-width:900px){.wrap{max-width:100%;padding:10px}.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.card{padding:9px;border-radius:10px;box-shadow:none}.section{margin-top:7px}.row{gap:7px}.chartwrap svg{height:220px}.brand{font-size:17px}}@media(max-width:600px){body{font-size:12px}.wrap{padding:7px}.top{margin-bottom:8px}.sub{font-size:9px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.wide,.full{grid-column:1/-1}.row{grid-template-columns:1fr;gap:6px}.value{font-size:16px}.small{font-size:10px}.section h2{font-size:11px;margin-bottom:5px}.pill{padding:3px 5px;font-size:10px}.chartbtn{min-height:36px;padding:7px 10px}.chartwrap svg{height:190px}.footer{font-size:9px}}@media(max-width:380px){.grid{grid-template-columns:1fr 1fr}.value{font-size:15px}.card{padding:8px}}
+</style></head>
+<body><div class="wrap">
+<div class="top"><div><div class="brand">BTCUSD Professional Market Intelligence</div><div class="sub">Microstructure • Order Book • Cross-Venue • Paper Execution • Risk Controls</div></div><div id="live" class="live">CONNECTING</div></div>
+<div id="cards" class="grid"></div>
+<div class="section row">
+<div class="card"><h2>Market Regime</h2><div id="regime"></div></div>
+<div class="card"><h2>Execution Quality</h2><div id="execution"></div></div>
+</div>
+<div class="section row">
+<div class="card"><h2>Market Conditions</h2><ul id="conditions"></ul></div>
+<div class="card"><h2>Trading Insights</h2><ul id="insights"></ul></div>
+</div>
+<div class="section row">
+<div class="card"><h2>Paper Strategy</h2><div id="paper"></div></div>
+<div class="card"><h2>Risk & Governance</h2><div id="risk"></div></div>
+</div>
+<div class="section"><div class="card full"><h2>Live Data Feeder</h2><div id="feedstatus" class="row"></div><div class="small">Delta live OHLC + microstructure feed. Browser refreshes every 2 seconds; server refreshes market data every 5 seconds. Read-only.</div></div></div>\n<div class="section"><div class="card full"><h2>Interactive Price & Trend</h2><div class="chartbox"><div class="charttools"><button type="button" class="chartbtn active" data-tf="1m">1 MIN</button><button type="button" class="chartbtn" data-tf="5m">5 MIN</button><button type="button" class="chartbtn" data-tf="1h">1 HOUR</button></div><div class="chartwrap"><svg id="pricechart" viewBox="0 0 900 280" role="img" aria-label="BTCUSD price chart"></svg></div><div id="chartinfo" class="chartinfo small"></div><div id="patterns" class="small" style="margin-top:8px"></div></div></div></div>
+<div class="section"><div class="card full"><h2>AI Market Forecaster — Scalper Intelligence</h2><div id="forecast" class="row"></div><div id="forecastExtra" class="row"></div><div class="small">Short-horizon research forecast using multi-window flow, order-book imbalance, CVD, momentum, spread and data freshness. Probability and confidence are model estimates; they are not guaranteed odds. Production accuracy remains subject to calibration.</div></div></div>
+<div class="section"><div class="card full"><h2>Advanced Scalper Intelligence</h2><div id="advanced" class="grid"></div><div class="small">Market-quality ranking and forecast calibration are research analytics only.</div></div></div>\n<div class="section"><div class="card full"><h2>Perpetual Markets</h2><div id="perpetuals" class="grid"></div><div class="small">Live perpetual contracts from Delta. Compact watchlist; execution remains BTCUSD-only and disabled.</div></div></div>\n<div class="section"><div class="card full"><h2>Professional Decision Panel</h2><div id="decision" class="row"></div><div class="small">Decision is advisory/research only. No order submission. Consensus requires agreement across 1m, 5m and 1h plus acceptable data and execution quality.</div></div></div>
+<div class="section"><div class="card full"><h2>Multi-Timeframe Decision</h2><div id="timeframes" class="grid"></div><div class="small">BUY/SELL/HOLD is a research signal, not an order instruction. Built from Delta OHLC trend, EMA20/EMA50, RSI14 and short momentum.</div></div></div>
+<div class="section"><div class="card full"><h2>System Status</h2><div id="system"></div></div></div>
+<div class="footer">READ-ONLY DASHBOARD • REAL ORDERS DISABLED • DATA REFRESH 1s</div>
+</div>
+<script>
+const N=(x,d=2)=>Number(x||0).toFixed(d), esc=x=>String(x??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const pill=(x,c='')=>'<span class="pill '+c+'">'+x+'</span>';
+let chartData={},selectedTF='1m',lastFeedPrice=null;
+const chartNum=(x,d=1)=>Number.isFinite(Number(x))?Number(x).toFixed(d):'—';
+function emaSeries(vals,n){if(vals.length<n)return Array(vals.length).fill(null);let out=Array(vals.length).fill(null),e=vals.slice(0,n).reduce((a,b)=>a+b,0)/n,k=2/(n+1);out[n-1]=e;for(let i=n;i<vals.length;i++){e=vals[i]*k+e*(1-k);out[i]=e}return out}
+function renderChart(all){
+ chartData=all||{};let pack=chartData[selectedTF]||{},rows=(pack.candles||pack||[]).filter(r=>Number.isFinite(Number(r.close))),markers=pack.markers||[];
+ const svg=document.querySelector('#pricechart'),info=document.querySelector('#chartinfo'); if(!svg)return;
+ if(rows.length<2){svg.innerHTML='<text x="450" y="140" text-anchor="middle" fill="#8190a2" font-size="14">Waiting for candle history…</text>';info.textContent='No chart data available';return}
+ const W=900,H=280,L=48,R=14,T=14,B=28, vals=rows.map(r=>Number(r.close)), e20=emaSeries(vals,20), e50=emaSeries(vals,50), allv=vals.concat(e20.filter(Number.isFinite),e50.filter(Number.isFinite)),lo=Math.min(...allv),hi=Math.max(...allv),pad=(hi-lo)*.08||1,y0=lo-pad,y1=hi+pad, sx=i=>L+i*(W-L-R)/(rows.length-1), sy=v=>T+(y1-v)*(H-T-B)/(y1-y0);
+ let parts=['<rect x="0" y="0" width="900" height="280" fill="#091018"/>'];
+ for(let j=0;j<5;j++){let y=T+j*(H-T-B)/4,v=y1-j*(y1-y0)/4;parts.push('<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#182431"/>','<text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" fill="#66788c" font-size="10">'+N(v,1)+'</text>')}
+ const path=(series,stroke)=>'<polyline fill="none" stroke="'+stroke+'" stroke-width="2" points="'+series.map((v,i)=>Number.isFinite(v)?sx(i)+','+sy(v):'').filter(Boolean).join(' ')+'"/>';
+ parts.push(path(vals,'#e8eef5'),path(e20,'#69a7ff'),path(e50,'#f4c95d'));
+ const byTime=new Map(rows.map((r,i)=>[Number(r.time),i]));
+ markers.forEach(m=>{const i=byTime.get(Number(m.time));if(i==null)return;const buy=m.side==='BUY',yy=sy(Number(m.price)),xx=sx(i);const fill=buy?'#42d392':'#ff6474';const tri=buy?xx+','+(yy+8)+' '+(xx-6)+','+(yy+18)+' '+(xx+6)+','+(yy+18):xx+','+(yy-8)+' '+(xx-6)+','+(yy-18)+' '+(xx+6)+','+(yy-18);parts.push('<polygon points="'+tri+'" fill="'+fill+'"/>','<text x="'+xx+'" y="'+(buy?yy+30:yy-22)+'" text-anchor="middle" fill="'+fill+'" font-size="9" font-weight="700">'+m.side+'</text>')});
+ const last=vals[vals.length-1];parts.push('<circle cx="'+sx(vals.length-1)+'" cy="'+sy(last)+'" r="4" fill="#e8eef5"/>');
+ parts.push('<text x="'+(W-R)+'" y="'+(H-7)+'" text-anchor="end" fill="#8190a2" font-size="10">EMA20  •  EMA50  •  close</text>');
+ parts.push('<rect id="chartHit" x="'+L+'" y="'+T+'" width="'+(W-L-R)+'" height="'+(H-T-B)+'" fill="transparent" tabindex="0"/>');
+ svg.innerHTML=parts.join('');
+ const pats=(pack.patterns||[]).slice(-8);document.querySelector('#patterns').innerHTML=pats.length?'<b>Recent candle patterns:</b> '+pats.map(p=>'<span class="pill '+(p.side==='BUY'?'good':p.side==='SELL'?'bad':'warn')+'">'+esc(p.pattern)+' @ '+N(p.price,1)+'</span>').join(''):'<span class="small">No recognized pattern in recent candles.</span>';info.innerHTML='<span>'+selectedTF.toUpperCase()+' • '+rows.length+' candles</span><span>Last <b>'+N(last,1)+'</b> • High '+N(Math.max(...vals),1)+' • Low '+N(Math.min(...vals),1)+'</span>';
+ const hit=document.querySelector('#chartHit');hit.addEventListener('pointerdown',ev=>{const rect=svg.getBoundingClientRect(),px=(ev.clientX-rect.left)/rect.width*W,i=Math.max(0,Math.min(rows.length-1,Math.round((px-L)*(rows.length-1)/(W-L-R))));const r=rows[i];info.innerHTML='<span>'+selectedTF.toUpperCase()+' • '+new Date(Number(r.time)*1000).toLocaleString()+'</span><span>O '+N(r.open,1)+' • H '+N(r.high,1)+' • L '+N(r.low,1)+' • C <b>'+N(r.close,1)+'</b></span>'});
+}
+document.querySelectorAll('.chartbtn').forEach(btn=>btn.addEventListener('click',()=>{selectedTF=btn.dataset.tf;document.querySelectorAll('.chartbtn').forEach(b=>b.classList.toggle('active',b===btn));renderChart(chartData)}));
+let perpLast=0;
+async function loadPerpetuals(){
+ if(Date.now()-perpLast<15000)return;
+ perpLast=Date.now();
+ try{
+  const z=await (await fetch('/api/perpetuals',{cache:'no-store'})).json();
+  const rows=(z.products||[]).filter(r=>r.symbol).sort((a,b)=>Math.abs(Number(b.volume||0))-Math.abs(Number(a.volume||0))).slice(0,24);
+  document.querySelector('#perpetuals').innerHTML=rows.map(r=>{
+   const ch=Number(r.change_24h||0),fund=Number(r.funding_rate||0),px=r.close??r.mark_price??'—';
+   const cl=ch>0?'good':ch<0?'bad':'warn';
+   return '<div class="card"><div class="label">'+esc(r.symbol)+'</div><div class="value">'+(typeof px==='number'?N(px,2):esc(px))+'</div><div class="small '+cl+'">24h '+N(ch,2)+'% • OI '+esc(r.oi??'—')+'</div><div class="small">Funding '+N(fund,5)+' • Lev '+esc(r.default_leverage??'—')+'x</div></div>';
+  }).join('')||'<div class="small">Perpetual data unavailable.</div>';
+ }catch(e){}
+}
+let advancedLast=0;
+async function loadAdvanced(){if(Date.now()-advancedLast<15000)return;advancedLast=Date.now();try{const z=await (await fetch('/api/advanced',{cache:'no-store'})).json(),f=z.forecast||{},st=z.forecast_stats||{},rows=z.market_quality||[],top=rows.slice(0,6);document.querySelector('#advanced').innerHTML='<div class="card"><div class="label">FORECAST CALIBRATION</div><div class="value">'+(st.n||0)+' OUTCOMES</div><div class="small">Accuracy '+(st.accuracy==null?'—':N(st.accuracy*100,1)+'%')+' • Avg '+N(st.avg_move_bps,2)+' bps</div></div><div class="card"><div class="label">MODEL STATUS</div><div class="value warn">'+esc(st.status||'RESEARCH_ONLY')+'</div><div class="small">Paper-only • no orders</div></div>'+top.map(r=>'<div class="card"><div class="label">'+esc(r.symbol)+'</div><div class="value">'+N(r.market_quality,1)+'</div><div class="small">Quality • 24h '+N(r.change_24h,2)+'% • Vol '+esc(r.volume??'—')+'</div></div>').join('')||'<div class="small">Waiting for market-quality data.</div>';}catch(e){}}
+async function load(){
+ try{
+  const x=await (await fetch('/api/state',{cache:'no-store'})).json(),s=x.micro||{},w=s.windows||{},o=s.order_book||{},p=s.price||{},q=s.quality||{},e=(x.cross||{}).edge_v42||{},ps=x.paper||{},tr=ps.trades_detail||[];
+  const d5=(w['5']?.delta_pct||0)*100,d30=(w['30']?.delta_pct||0)*100,d60=(w['60']?.delta_pct||0)*100,imb=(o.imbalance_5||0)*100;
+  const fresh=Number(q.fresh_seconds??99), stateAge=Number((x.health||{}).micro_state_age_s??99), fileAge=Number((x.health||{}).micro_file_age_s??99), stale=Boolean((x.health||{}).micro_stale)||(stateAge>6)||(fileAge>6), spread=Number(o.spread||0), mid=Number(o.mid_price||0);
+  const cards=[['BTCUSD',N(mid,1),'LIVE'],['5s DELTA',N(d5,2)+'%',d5>0?'BUY':'SELL'],['30s DELTA',N(d30,2)+'%',d30>0?'BUY':'SELL'],['60s DELTA',N(d60,2)+'%',d60>0?'BUY':'SELL'],['BOOK IMBALANCE',N(imb,1)+'%',imb>0?'BID':'ASK'],['SPREAD',N(spread,2),'price units'],['CVD SLOPE',N(s.cvd_slope_30s,0),'30s'],['REGIME',esc(s.regime||'UNKNOWN'),'microstructure'],['CROSS VENUE',esc(e.state||'NO DATA'),e.spread_bps?N(e.spread_bps,2)+' bps':'—'],['PAPER NET',N(ps.total_net_bps,2)+' bps',(ps.trades||0)+' trades'],['WIN RATE',N((ps.win_rate||0)*100,1)+'%',ps.wins||0+' wins'],['PROFIT FACTOR',ps.profit_factor==null?'—':N(ps.profit_factor,2),'paper']];
+  const feedAge=Number((x.health||{}).micro_event_fresh_s??99),feedState=feedAge<=6?'LIVE':'STALE',livePx=Number(o.mid_price||0);document.querySelector('#feedstatus').innerHTML='<div class="card"><div class="label">FEED</div><div class="value '+(feedState==='LIVE'?'good':'bad')+'">● '+feedState+'</div><div class="small">event age '+N(feedAge,2)+'s</div></div><div class="card"><div class="label">LIVE MID</div><div class="value">'+N(livePx,1)+'</div><div class="small">'+(lastFeedPrice==null?'initial':(livePx>lastFeedPrice?'↑ price pulse':livePx<lastFeedPrice?'↓ price pulse':'→ stable'))+'</div></div><div class="card"><div class="label">SERVER</div><div class="value">'+N((x.health||{}).refresh_ms,0)+' ms</div><div class="small">5s market refresh</div></div><div class="card"><div class="label">MICROSTRUCTURE</div><div class="value '+(stale?'bad':'good')+'">'+(stale?'STALE':'FRESH')+'</div><div class="small">state '+N(stateAge,2)+'s</div></div>';lastFeedPrice=livePx;document.querySelector('#cards').innerHTML=cards.map(a=>'<div class="card"><div class="label">'+a[0]+'</div><div class="value">'+a[1]+'</div><div class="small">'+a[2]+'</div></div>').join('');
+  const tf=x.timeframes||{}, names=[['1m','1 MINUTE'],['5m','5 MINUTES'],['1h','1 HOUR']];
+  const hs=x.health||{},pd=tf._professional_decision||{},fc=tf._forecast||{};
+  const f30=fc.horizon_30s||{},f60=fc.horizon_60s||{};
+  const fd30=f30.direction||'UNRELIABLE',fd60=f60.direction||'UNRELIABLE';
+  const fc30=fd30==='UP'?'good':fd30==='DOWN'?'bad':'warn',fc60=fd60==='UP'?'good':fd60==='DOWN'?'bad':'warn';
+  document.querySelector('#forecast').innerHTML='<div class="card"><div class="label">NEXT 30 SEC</div><div class="value '+fc30+'">'+fd30+'</div><div class="small">Strength '+N(f30.strength,0)+'% • score '+N(fc.raw_score,2)+'</div></div><div class="card"><div class="label">NEXT 60 SEC</div><div class="value '+fc60+'">'+fd60+'</div><div class="small">Strength '+N(f60.strength,0)+'%</div></div><div class="card"><div class="label">FORECAST QUALITY</div><div class="value warn">'+esc(fc.calibration||'UNVALIDATED')+'</div><div class="small">'+((fc.vetoes||[]).join(' • ')||'No current veto')+'</div></div><div class="card"><div class="label">DRIVERS</div><div class="small">Δ5 '+N((fc.drivers||{}).delta5*100,2)+'% • Δ30 '+N((fc.drivers||{}).delta30*100,2)+'% • Book '+N((fc.drivers||{}).imbalance*100,1)+'% • CVD '+N((fc.drivers||{}).cvd_slope,0)+'</div></div>';
+  loadPerpetuals();
+  loadAdvanced();
+  const fd=fc.drivers||{};
+  document.querySelector('#forecastExtra').innerHTML='<div class="card"><div class="label">PROB UP</div><div class="value">'+N(fc.prob_up,1)+'%</div><div class="small">Down '+N(fc.prob_down,1)+'%</div></div><div class="card"><div class="label">REGIME</div><div class="value">'+esc(fc.regime||'MIXED')+'</div><div class="small">Agreement '+N(Number(fd.agreement||0)*100,0)+'% • Absorption '+(fd.absorption?'YES':'NO')+'</div></div><div class="card"><div class="label">RELIABILITY</div><div class="value">'+esc(fc.reliability||'LOW')+'</div><div class="small">Unvalidated research</div></div><div class="card"><div class="label">EXECUTION</div><div class="value">'+esc(fc.execution_quality||'UNKNOWN')+'</div><div class="small">Spread '+N(fc.spread_bps,2)+' bps</div></div>';
+  const a1=tf['1m']||{},a5=tf['5m']||{},a60=tf['1h']||{},sigs=[a1.signal,a5.signal,a60.signal];
+  const buys=sigs.filter(z=>z==='BUY').length,sells=sigs.filter(z=>z==='SELL').length;
+  let bias=buys>=2?'BUY':sells>=2?'SELL':'HOLD', agreement=Math.max(buys,sells)/3;
+  const blocked=stale||spread>5||hs.status!=='OK'||e.state==='DIVERGENCE';
+  if(blocked && bias!=='HOLD') bias='HOLD';
+  const decisionScore=Math.round(agreement*60+(blocked?0:25)+Math.min(15,Math.abs((a1.score||0)+(a5.score||0)+(a60.score||0))*2));
+  const dclass=bias==='BUY'?'good':bias==='SELL'?'bad':'warn';
+  const finalBias=pd.action||'NO_TRADE', finalClass=finalBias==='LONG'?'good':finalBias==='SHORT'?'bad':'warn';
+  document.querySelector('#decision').innerHTML='<div class="card"><div class="label">PROFESSIONAL ACTION</div><div class="value '+finalClass+'">'+finalBias+'</div><div class="small">Base '+(pd.base_action||'NO_TRADE')+' • score '+N(pd.score,2)+'</div></div><div class="card"><div class="label">CONFIDENCE</div><div class="value">'+N(pd.confidence,0)+'%</div><div class="small">Auditable research score</div></div><div class="card"><div class="label">GOVERNANCE</div><div class="value '+((pd.vetoes||[]).length?'bad':'good')+'">'+((pd.vetoes||[]).length?'BLOCKED':'CLEAR')+'</div><div class="small">'+((pd.vetoes||[]).join(' • ')||'No vetoes')+'</div></div><div class="card"><div class="label">EVIDENCE</div><div class="small">'+((pd.reasons||[]).join(' • ')||'Insufficient evidence')+'</div></div>';
+  document.querySelector('#system').innerHTML=pill('Microstructure '+(stale?'STALE':'LIVE'),stale?'bad':'good')+pill('API '+(hs.status||'UNKNOWN'),hs.status==='OK'?'good':'warn')+pill('REST cache '+N(hs.cache_age_s,1)+'s',hs.cache_age_s<45?'good':'warn')+pill('Read-only')+pill('No order submission')+'<div class="metric"><span>Live event age</span><b>'+N(fresh,2)+'s</b></div><div class="metric"><span>State age</span><b>'+N(stateAge,2)+'s</b></div><div class="metric"><span>State file age</span><b>'+N(fileAge,2)+'s</b></div><div class="metric"><span>REST refresh latency</span><b>'+N(hs.refresh_ms,0)+' ms</b></div>';
+  document.querySelector('#timeframes').innerHTML=names.map(([k,label])=>{const a=tf[k]||{},sig=a.signal||'HOLD',cl=sig==='BUY'?'good':sig==='SELL'?'bad':'warn';return '<div class="card"><div class="label">'+label+'</div><div class="value '+cl+'">'+sig+'</div><div class="small">Confidence '+N(a.confidence,0)+'% • Score '+N(a.score,0)+'</div><div class="small">RSI '+N(a.rsi14,1)+' • EMA20 '+N(a.ema20,1)+' • EMA50 '+N(a.ema50,1)+'</div><div class="small">Momentum '+N(a.return_pct,3)+'% • '+(a.candles||0)+' candles</div></div>'}).join('');
+  renderChart(tf._charts||{});
+  document.querySelector('#live').textContent=stale?'● STALE':'● LIVE';document.querySelector('#live').className='live '+(stale?'warn':'');
+  document.querySelector('#regime').innerHTML='<div class="value">'+esc(s.regime||'UNKNOWN')+'</div>'+pill('5s Δ '+N(d5,2)+'%',d5>0?'good':'bad')+pill('30s Δ '+N(d30,2)+'%',d30>0?'good':'bad')+pill('60s Δ '+N(d60,2)+'%',d60>0?'good':'bad')+pill('CVD '+N(s.cvd,0))+pill('CVD slope '+N(s.cvd_slope_30s,0));
+  const stress=spread>5?'HIGH':spread>3?'ELEVATED':'NORMAL';
+  document.querySelector('#execution').innerHTML='<div>'+pill('Spread '+N(spread,2))+pill('Spread stress '+stress,stress==='NORMAL'?'good':stress==='ELEVATED'?'warn':'bad')+pill('Event age '+N(fresh,2)+'s',fresh<=6?'good':'bad')+'</div><div class="metric"><span>Bid</span><b>'+N(o.bid,1)+'</b></div><div class="metric"><span>Ask</span><b>'+N(o.ask,1)+'</b></div><div class="metric"><span>L2 imbalance</span><b>'+N(imb,1)+'%</b></div>';
+  let c=[stale?'Data freshness: STALE':'Data freshness: HEALTHY', 'Regime: '+(s.regime||'UNKNOWN'), 'Order book: '+N(imb,1)+'% '+(imb>=0?'bid':'ask')+' imbalance', 'Flow: 5s '+N(d5,2)+'% / 30s '+N(d30,2)+'% / 60s '+N(d60,2)+'%', 'Cross-venue: '+(e.state||'NO DATA')+(e.spread_bps?' ('+N(e.spread_bps,2)+' bps)':'')];
+  if(spread>5)c.push('Execution blocked: spread above 5 bps'); else c.push('Execution spread within 5 bps research limit');
+  document.querySelector('#conditions').innerHTML=c.map(z=>'<li>'+esc(z)+'</li>').join('');
+  let i=['5s momentum: '+N(p['5']?.return_pct,4)+'%', 'CVD: '+N(s.cvd,0)+' | slope: '+N(s.cvd_slope_30s,0), 'Paper candidates: '+(ps.candidates||0), 'Paper rejections: '+esc(JSON.stringify(ps.rejections||{}))];
+  if(e.state==='DIVERGENCE')i.push('Cross-venue divergence: confirmation required');
+  else if(e.state==='VENUE_CONFIRMATION')i.push('Cross-venue confirmation present');
+  document.querySelector('#insights').innerHTML=i.map(z=>'<li>'+z+'</li>').join('');
+  const last=tr.length?tr[tr.length-1]:null;
+  document.querySelector('#paper').innerHTML='<div>'+pill('Trades '+(ps.trades||0))+pill('Wins '+(ps.wins||0),'good')+pill('Losses '+(ps.losses||0),'bad')+pill('Avg '+N(ps.avg_net_bps,2)+' bps')+pill('Net '+N(ps.total_net_bps,2)+' bps')+'</div>'+ (last?'<div class="metric"><span>Last trade</span><b>'+esc(last.side)+' / '+esc(last.exit_reason)+' / '+N(last.net_bps,2)+' bps</b></div>':'<div class="small">Waiting for completed paper trades…</div>')+'<div class="small">Evaluation is research-only; do not infer profitability from a small sample.</div>';
+  document.querySelector('#risk').innerHTML=pill('ONE POSITION')+pill('30s HOLD')+pill('STOP 8 bps')+pill('TARGET 16 bps')+pill('COST 5 bps')+pill('PAPER ONLY','good')+pill('REAL ORDERS DISABLED','good')+'<div class="metric"><span>Decision</span><b>Research / paper evaluation</b></div><div class="metric"><span>Cross-venue promotion</span><b>Not validated</b></div>';
+  document.querySelector('#system').innerHTML+= '<div class="metric"><span>Browser update</span><b>'+new Date().toLocaleTimeString()+'</b></div>';
+ }catch(err){document.querySelector('#live').textContent='● API ERROR';document.querySelector('#live').className='live bad';console.error(err)}
+}
+let lastLoad=0;async function androidLoad(){if(document.visibilityState!=='visible')return;const now=Date.now();if(now-lastLoad<1800)return;lastLoad=now;await load()}androidLoad();setInterval(androidLoad,2000);
+</script></body></html>
