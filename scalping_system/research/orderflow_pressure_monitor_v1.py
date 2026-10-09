@@ -14,7 +14,7 @@ OUT=ROOT/'data/processed/orderflow_pressure_live_v1.json'
 LOG=ROOT/'data/processed/orderflow_pressure_events_v1.jsonl'
 CURSOR=ROOT/'data/processed/orderflow_pressure_cursor_v1.json'
 MAX_LOG_BYTES=10_000_000
-WINDOWS=(5,30,60)
+WINDOWS=(0.5,1,5,30,60)
 MAX_TRADES=5000
 MAX_BOOKS=1500
 MAX_L1=1500
@@ -135,7 +135,9 @@ class Monitor:
             if len(bs)>=3:
                 trough=min(bs); base=bs[0]; cur=bs[-1]
                 replenish[side]=max(0,(cur-trough)/(base-trough)) if base>trough else None
-        f30=flow['30']; p30=f30['price_change_bps']; d30=f30['delta_ratio']
+        f500=flow['0.5']; f1=flow['1']; f5=flow['5']; f30=flow['30']; p30=f30['price_change_bps']; d30=f30['delta_ratio']
+        short_sign=lambda x: 1 if x is not None and x>0 else -1 if x is not None and x<0 else 0
+        incremental_flow={'window_ms':500,'buy_volume':f500['buy_volume'],'sell_volume':f500['sell_volume'],'signed_delta':f500['signed_delta'],'delta_ratio':f500['delta_ratio'],'trade_count':f500['trades'],'directional_persistence_500ms_1s_5s':bool(short_sign(f500['signed_delta'])!=0 and short_sign(f500['signed_delta'])==short_sign(f1['signed_delta'])==short_sign(f5['signed_delta'])),'interpretation':'rolling signed aggressor-volume proxy; not literal unmatched volume, wash-trade detection, or proof of hedge propagation'}
         absorption='NONE'
         if d30 is not None and p30 is not None:
             if d30<=-0.20 and p30>=-0.5 and replenish['bid'] is not None and replenish['bid']>=0.5:absorption='POSSIBLE_BUYER_ABSORPTION'
@@ -169,7 +171,7 @@ class Monitor:
         if not data_ok: veto='STALE_OR_INSUFFICIENT_DATA'
         elif not latency_ok: veto='EVENT_TO_RECEIVE_LATENCY_UNVERIFIED_OR_OVER_LIMIT'
         else:veto='CALIBRATION_REQUIRED_BEFORE_PAPER_CANDIDATE'
-        return {'schema':'orderflow_pressure_live_v1','updated_at_epoch':now,'symbol':'BTCUSD','read_only':True,'research_only':True,'real_orders':False,'live_execution_enabled':False,'source_events_seen':self.events,'source_resets':self.source_resets,'parse_errors':self.parse_errors,'mid_price':mid,'best_bid':latest['bid'] if latest else None,'best_ask':latest['ask'] if latest else None,'spread_bps':spread_bps,'l1_imbalance':ob_imb,'vamp':vamp,'vamp_displacement_bps':vamp_bps,'vamp_direction':vamp_direction,'vamp_inside_spread':vamp_inside,'ofi_direction':ofi_direction,'ofi_vamp_disagreement':ofi_vamp_disagreement,'ofi_5s':ofi,'ofi_5s_normalized_by_mid':ofi_mid,'ofi_event_count_5s':len(ofi_rows),'flow':flow,'cvd_rolling_observation':self.cvd,'depth_replenishment_30s':replenish,'possible_absorption_candidate':absorption,'delta_divergence_trap_candidate':trap_candidate,'buy_sell_3x_candidate':ratio_candidate,'sell_buy_3x_candidate':sell_candidate,'event_to_receive_ms_estimate':{'samples':len(lat),'negative_clock_skew_samples':negative_skew,'p50_nonnegative_ms':p50,'p95_nonnegative_ms':p95,'max_nonnegative_ms':max(lat_nonneg) if lat_nonneg else None,'clock_skew_can_bias_estimate':True,'not_exchange_order_ack_latency':True},'book_age_ms':age_ms,'trade_age_ms':trade_age_ms,'data_quality_ok':data_ok,'latency_gate_passed':latency_ok,'candidate_veto_reason':veto,'calibration_status':'NOT_CALIBRATED_FOR_THIS_FEATURE_SCHEMA','policy':'OBSERVE_AND_LABEL_ONLY_NO_ENTRY_SIGNAL','ratio_semantics':'30s aggregate aggressor-volume ratio, not per-price footprint imbalance'}
+        return {'schema':'orderflow_pressure_live_v1','updated_at_epoch':now,'symbol':'BTCUSD','read_only':True,'research_only':True,'real_orders':False,'live_execution_enabled':False,'source_events_seen':self.events,'source_resets':self.source_resets,'parse_errors':self.parse_errors,'mid_price':mid,'best_bid':latest['bid'] if latest else None,'best_ask':latest['ask'] if latest else None,'spread_bps':spread_bps,'l1_imbalance':ob_imb,'vamp':vamp,'vamp_displacement_bps':vamp_bps,'vamp_direction':vamp_direction,'vamp_inside_spread':vamp_inside,'ofi_direction':ofi_direction,'ofi_vamp_disagreement':ofi_vamp_disagreement,'ofi_5s':ofi,'ofi_5s_normalized_by_mid':ofi_mid,'ofi_event_count_5s':len(ofi_rows),'flow':flow,'incremental_flow_500ms':incremental_flow,'cvd_rolling_observation':self.cvd,'depth_replenishment_30s':replenish,'possible_absorption_candidate':absorption,'delta_divergence_trap_candidate':trap_candidate,'buy_sell_3x_candidate':ratio_candidate,'sell_buy_3x_candidate':sell_candidate,'event_to_receive_ms_estimate':{'samples':len(lat),'negative_clock_skew_samples':negative_skew,'p50_nonnegative_ms':p50,'p95_nonnegative_ms':p95,'max_nonnegative_ms':max(lat_nonneg) if lat_nonneg else None,'clock_skew_can_bias_estimate':True,'not_exchange_order_ack_latency':True},'book_age_ms':age_ms,'trade_age_ms':trade_age_ms,'data_quality_ok':data_ok,'latency_gate_passed':latency_ok,'candidate_veto_reason':veto,'calibration_status':'NOT_CALIBRATED_FOR_THIS_FEATURE_SCHEMA','policy':'OBSERVE_AND_LABEL_ONLY_NO_ENTRY_SIGNAL','ratio_semantics':'30s aggregate aggressor-volume ratio, not per-price footprint imbalance'}
 
 def load_cursor():
     try:return json.loads(CURSOR.read_text())

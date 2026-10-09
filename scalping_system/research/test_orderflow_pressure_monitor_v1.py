@@ -39,6 +39,17 @@ class OrderflowPressureTests(unittest.TestCase):
   s=m.snapshot(now=1791565203)
   self.assertTrue(s['ofi_vamp_disagreement'])
   self.assertTrue(s['vamp_inside_spread'])
+
+ def test_500ms_incremental_flow_is_a_proxy_not_unmatched_volume(self):
+  m=Monitor()
+  m.ingest({'received_at':'2026-10-09T17:00:01+00:00','message':{'type':'ob_l1','ts':1791565201000000,'bp':'100','bs':'10','ap':'101','as':'10'}})
+  for sec,px,qty in [(2,101,60),(2,100,10)]:
+   m.ingest({'received_at':f'2026-10-09T17:00:0{sec}+00:00','message':{'type':'trades','ts':1791565200000000+sec*1000000+qty,'p':str(px),'s':str(qty)}})
+  s=m.snapshot(now=1791565202.2)
+  f=s['incremental_flow_500ms']
+  self.assertEqual(f['window_ms'],500)
+  self.assertEqual(f['signed_delta'],50)
+  self.assertIn('not literal unmatched volume',f['interpretation'])
  def test_timestamp_unit_conversion(self):
   self.assertEqual(ts_seconds({'ts':1791565201000000}),1791565201)
 
