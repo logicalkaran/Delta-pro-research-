@@ -1,0 +1,295 @@
+{
+  "status": "RESEARCH_ONLY",
+  "selector": {
+    "side": "LONG",
+    "horizon_s": 300,
+    "flow_min": 0.35,
+    "momentum_min_bps": 2,
+    "spread_max_bps": 5
+  },
+  "raw_trade_events": 72676,
+  "signals_after_cooldown": 48,
+  "fill_warning": "Maker results are hypothetical touch fills; queue position and cancellations are unavailable in this dataset. Adverse-selection penalties are stress scenarios, not measured fills.",
+  "results": [
+    {
+      "stop_bps": 5,
+      "target_bps": 10,
+      "model": "maker",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.25,
+        "avg_net_bps": -2.4412749846794686,
+        "total_net_bps": -117.18119926461449,
+        "profit_factor": 0.4144485708937874,
+        "max_drawdown_bps": 147.7749194570297
+      }
+    },
+    {
+      "stop_bps": 5,
+      "target_bps": 10,
+      "model": "maker",
+      "adverse_selection_bps": 1,
+      "result": {
+        "n": 48,
+        "win_rate": 0.22916666666666666,
+        "avg_net_bps": -3.4412749846794686,
+        "total_net_bps": -165.1811992646145,
+        "profit_factor": 0.30215933188003385,
+        "max_drawdown_bps": 192.7749194570297
+      }
+    },
+    {
+      "stop_bps": 5,
+      "target_bps": 10,
+      "model": "maker",
+      "adverse_selection_bps": 2,
+      "result": {
+        "n": 48,
+        "win_rate": 0.1875,
+        "avg_net_bps": -4.441274984679469,
+        "total_net_bps": -213.1811992646145,
+        "profit_factor": 0.22520694572531127,
+        "max_drawdown_bps": 237.7749194570297
+      }
+    },
+    {
+      "stop_bps": 5,
+      "target_bps": 10,
+      "model": "maker",
+      "adverse_selection_bps": 3,
+      "result": {
+        "n": 48,
+        "win_rate": 0.16666666666666666,
+        "avg_net_bps": -5.441274984679468,
+        "total_net_bps": -261.18119926461446,
+        "profit_factor": 0.16991034394302074,
+        "max_drawdown_bps": 282.77491945702974
+      }
+    },
+    {
+      "stop_bps": 5,
+      "target_bps": 10,
+      "model": "taker_reference",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.0,
+        "avg_net_bps": -14.289626989677537,
+        "total_net_bps": -685.9020955045218,
+        "profit_factor": 0.0,
+        "max_drawdown_bps": 685.9020955045218
+      }
+    },
+    {
+      "stop_bps": 8,
+      "target_bps": 16,
+      "model": "maker",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.3125,
+        "avg_net_bps": 1.1950452527628848,
+        "total_net_bps": 57.36217213261847,
+        "profit_factor": 1.2433341626335337,
+        "max_drawdown_bps": 173.91498415558803
+      }
+    },
+    {
+      "stop_bps": 8,
+      "target_bps": 16,
+      "model": "maker",
+      "adverse_selection_bps": 1,
+      "result": {
+        "n": 48,
+        "win_rate": 0.2916666666666667,
+        "avg_net_bps": 0.19504525276288467,
+        "total_net_bps": 9.362172132618465,
+        "profit_factor": 1.034762730856718,
+        "max_drawdown_bps": 218.914984155588
+      }
+    },
+    {
+      "stop_bps": 8,
+      "target_bps": 16,
+      "model": "maker",
+      "adverse_selection_bps": 2,
+      "result": {
+        "n": 48,
+        "win_rate": 0.25,
+        "avg_net_bps": -0.8049547472371152,
+        "total_net_bps": -38.63782786738153,
+        "profit_factor": 0.8732184321018711,
+        "max_drawdown_bps": 263.914984155588
+      }
+    },
+    {
+      "stop_bps": 8,
+      "target_bps": 16,
+      "model": "maker",
+      "adverse_selection_bps": 3,
+      "result": {
+        "n": 48,
+        "win_rate": 0.20833333333333334,
+        "avg_net_bps": -1.8049547472371152,
+        "total_net_bps": -86.63782786738153,
+        "profit_factor": 0.7465275366676942,
+        "max_drawdown_bps": 308.91498415558806
+      }
+    },
+    {
+      "stop_bps": 8,
+      "target_bps": 16,
+      "model": "taker_reference",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.0625,
+        "avg_net_bps": -10.664472774143842,
+        "total_net_bps": -511.89469315890443,
+        "profit_factor": 0.29024748605394524,
+        "max_drawdown_bps": 716.1195511387191
+      }
+    },
+    {
+      "stop_bps": 10,
+      "target_bps": 20,
+      "model": "maker",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.375,
+        "avg_net_bps": 1.5916825885504613,
+        "total_net_bps": 76.40076425042214,
+        "profit_factor": 1.3406497450870316,
+        "max_drawdown_bps": 154.8763920377843
+      }
+    },
+    {
+      "stop_bps": 10,
+      "target_bps": 20,
+      "model": "maker",
+      "adverse_selection_bps": 1,
+      "result": {
+        "n": 48,
+        "win_rate": 0.3333333333333333,
+        "avg_net_bps": 0.5916825885504614,
+        "total_net_bps": 28.40076425042215,
+        "profit_factor": 1.1110520973086704,
+        "max_drawdown_bps": 199.87639203778429
+      }
+    },
+    {
+      "stop_bps": 10,
+      "target_bps": 20,
+      "model": "maker",
+      "adverse_selection_bps": 2,
+      "result": {
+        "n": 48,
+        "win_rate": 0.25,
+        "avg_net_bps": -0.40831741144953854,
+        "total_net_bps": -19.59923574957785,
+        "profit_factor": 0.9324784259996641,
+        "max_drawdown_bps": 244.8763920377843
+      }
+    },
+    {
+      "stop_bps": 10,
+      "target_bps": 20,
+      "model": "maker",
+      "adverse_selection_bps": 3,
+      "result": {
+        "n": 48,
+        "win_rate": 0.20833333333333334,
+        "avg_net_bps": -1.4083174114495387,
+        "total_net_bps": -67.59923574957786,
+        "profit_factor": 0.7934709012615226,
+        "max_drawdown_bps": 289.8763920377843
+      }
+    },
+    {
+      "stop_bps": 10,
+      "target_bps": 20,
+      "model": "taker_reference",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.0625,
+        "avg_net_bps": -10.269048253278656,
+        "total_net_bps": -492.91431615737554,
+        "profit_factor": 0.30260665948895105,
+        "max_drawdown_bps": 697.1391741371901
+      }
+    },
+    {
+      "stop_bps": 12,
+      "target_bps": 24,
+      "model": "maker",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.375,
+        "avg_net_bps": 1.7749252169729688,
+        "total_net_bps": 85.1964104147025,
+        "profit_factor": 1.3878366924074383,
+        "max_drawdown_bps": 151.16594822426086
+      }
+    },
+    {
+      "stop_bps": 12,
+      "target_bps": 24,
+      "model": "maker",
+      "adverse_selection_bps": 1,
+      "result": {
+        "n": 48,
+        "win_rate": 0.3333333333333333,
+        "avg_net_bps": 0.7749252169729687,
+        "total_net_bps": 37.1964104147025,
+        "profit_factor": 1.1481137876299765,
+        "max_drawdown_bps": 191.08074587350393
+      }
+    },
+    {
+      "stop_bps": 12,
+      "target_bps": 24,
+      "model": "maker",
+      "adverse_selection_bps": 2,
+      "result": {
+        "n": 48,
+        "win_rate": 0.25,
+        "avg_net_bps": -0.2250747830270313,
+        "total_net_bps": -10.803589585297502,
+        "profit_factor": 0.9621799305706679,
+        "max_drawdown_bps": 236.08074587350396
+      }
+    },
+    {
+      "stop_bps": 12,
+      "target_bps": 24,
+      "model": "maker",
+      "adverse_selection_bps": 3,
+      "result": {
+        "n": 48,
+        "win_rate": 0.20833333333333334,
+        "avg_net_bps": -1.2250747830270312,
+        "total_net_bps": -58.8035895852975,
+        "profit_factor": 0.8177775703566098,
+        "max_drawdown_bps": 281.08074587350393
+      }
+    },
+    {
+      "stop_bps": 12,
+      "target_bps": 24,
+      "model": "taker_reference",
+      "adverse_selection_bps": 0,
+      "result": {
+        "n": 48,
+        "win_rate": 0.0625,
+        "avg_net_bps": -10.085806721251704,
+        "total_net_bps": -484.11872262008177,
+        "profit_factor": 0.31055545986452227,
+        "max_drawdown_bps": 688.3435805998963
+      }
+    }
+  ]
+}

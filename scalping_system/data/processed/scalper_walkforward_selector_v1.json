@@ -1,0 +1,110 @@
+{
+  "status": "RESEARCH_ONLY",
+  "episodes": 41,
+  "selected_trades": 16,
+  "win_rate": 0.0625,
+  "avg_net_bps": -13.486929994651463,
+  "sum_net_bps": -215.7908799144234,
+  "ending_equity": 804.4539845764667,
+  "return_pct": -19.55460154235332,
+  "selections": [
+    {
+      "episode": 29856287,
+      "strategy": "DELTA_DIVERGENCE",
+      "net_bps": -16.890932789980237,
+      "history_n": 2
+    },
+    {
+      "episode": 29856291,
+      "strategy": "ABSORPTION_REVERSAL",
+      "net_bps": -17.070960240689,
+      "history_n": 2
+    },
+    {
+      "episode": 29856299,
+      "strategy": "ABSORPTION_REVERSAL",
+      "net_bps": -16.838036324401845,
+      "history_n": 3
+    },
+    {
+      "episode": 29856301,
+      "strategy": "ABSORPTION_REVERSAL",
+      "net_bps": -17.36837750724967,
+      "history_n": 4
+    },
+    {
+      "episode": 29856302,
+      "strategy": "DELTA_DIVERGENCE",
+      "net_bps": -1.725195533739967,
+      "history_n": 5
+    },
+    {
+      "episode": 29856305,
+      "strategy": "ABSORPTION_REVERSAL",
+      "net_bps": -16.950116245625555,
+      "history_n": 7
+    },
+    {
+      "episode": 29856309,
+      "strategy": "DELTA_DIVERGENCE",
+      "net_bps": -14.907840573370208,
+      "history_n": 10
+    },
+    {
+      "episode": 29856310,
+      "strategy": "DELTA_DIVERGENCE",
+      "net_bps": -16.90036700988779,
+      "history_n": 11
+    },
+    {
+      "episode": 29856311,
+      "strategy": "DELTA_DIVERGENCE",
+      "net_bps": -17.67668750262245,
+      "history_n": 12
+    },
+    {
+      "episode": 29856312,
+      "strategy": "DELTA_DIVERGENCE",
+      "net_bps": -13.767380652889694,
+      "history_n": 13
+    },
+    {
+      "episode": 29856313,
+      "strategy": "MEAN_REVERSION",
+      "net_bps": -14.074077774712201,
+      "history_n": 17
+    },
+    {
+      "episode": 29856317,
+      "strategy": "MEAN_REVERSION",
+      "net_bps": -1.5424427398438147,
+      "history_n": 18
+    },
+    {
+      "episode": 29856318,
+      "strategy": "MEAN_REVERSION",
+      "net_bps": -17.078923734553804,
+      "history_n": 19
+    },
+    {
+      "episode": 29856320,
+      "strategy": "MEAN_REVERSION",
+      "net_bps": 1.751775173455082,
+      "history_n": 20
+    },
+    {
+      "episode": 29856324,
+      "strategy": "MEAN_REVERSION",
+      "net_bps": -17.67384058101382,
+      "history_n": 21
+    },
+    {
+      "episode": 29856325,
+      "strategy": "MEAN_REVERSION",
+      "net_bps": -17.07747587729845,
+      "history_n": 22
+    }
+  ],
+  "rule": "prior-history mean minus sqrt-sample penalty",
+  "live_orders": false
+}

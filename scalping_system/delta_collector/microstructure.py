@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "live_microstructure_state.json"
 
-WINDOWS = (5, 30, 60)
+WINDOWS = (1, 5, 30, 60)
 MAX_TRADES = 5000
 MAX_PRICES = 3000
 
@@ -151,6 +151,9 @@ def _book_stats():
         "imbalance_10": round(_imbalance(*d10), 6),
         "bid_levels": len(bids),
         "ask_levels": len(asks),
+        # Research telemetry only: top five price/size levels, best first.
+        "bids_l5": [[float(price), float(size)] for price, size in bids[:5]],
+        "asks_l5": [[float(price), float(size)] for price, size in asks[:5]],
     }
 
 

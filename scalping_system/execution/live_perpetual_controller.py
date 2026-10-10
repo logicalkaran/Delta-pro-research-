@@ -18,7 +18,10 @@ if str(ROOT) not in __import__('sys').path:
 from execution.delta_client_private import DeltaAuthClient
 from execution.delta_executor import DeltaExecutor, LiveExecutionBlocked
 from execution.live_trade_guard import GuardConfig, TradePlan, round_tick, validate
-from risk.production_guard import AccountState, MarketSnapshot, validate_production
+from risk.production_guard import MarketSnapshot, validate_market
+from exchange.delta_state_adapter import DeltaReadOnlyStateAdapter
+from storage.event_journal import EventJournal
+from execution.authoritative_account_risk import evaluate_authoritative_intent
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / "data" / "live_microstructure_state.json"
@@ -84,9 +87,20 @@ def active_position(payload) -> bool:
     return False
 
 
-def preflight(risk_distance: float) -> dict:
+def preflight(risk_distance: float, *, state_adapter=None, event_journal=None, now_ms=None) -> dict:
     state = _load_state()
+    # Validate authoritative account freshness before evaluating the strategy signal.
+    adapter = state_adapter or DeltaReadOnlyStateAdapter()
+    account = adapter.account_state()
+    current_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
+    if current_ms - int(account.observed_at_ms) > 5000 or int(account.observed_at_ms) - current_ms > 1000:
+        return {"timestamp": time.time(), "order_submission": "DISABLED", "signal": None,
+                "reason": "STALE_DATA_REJECTION"}
+    if not account.complete:
+        return {"timestamp": time.time(), "order_submission": "DISABLED", "signal": None,
+                "reason": "MISSING_ACCOUNT_FIELDS:" + ",".join(account.missing_fields)}
     side = signal(state)
+    journal = event_journal
     result = {
         "timestamp": time.time(), "symbol": SYMBOL, "product_id": PRODUCT_ID,
         "execution_mode": "LOCKED" if not (_env_bool("BTC_LIVE_EXECUTION") and _env_bool("BTC_LIVE_OPERATOR_APPROVED")) else "ARMED_REQUEST",
@@ -110,14 +124,36 @@ def preflight(risk_distance: float) -> dict:
     except (KeyError, TypeError, ValueError):
         result["reason"] = "PRODUCTION_SAFETY_INPUT_MISSING"
         return result
-    market_ok, market_reason = validate_production(
+    market_ok, market_reason = validate_market(
         MarketSnapshot(age_seconds=age, spread_bps=(spread / mid * 10000.0),
-                        estimated_slippage_bps=slippage),
-        AccountState(daily_loss_usd=0.0, consecutive_losses=0, open_positions=0,
-                     kill_switch=KILL.exists()),
-    )
+                        estimated_slippage_bps=slippage))
     if not market_ok:
         result["reason"] = market_reason
+        return result
+
+    proposed_btc = (1 if side == "LONG" else -1) * CONTRACTS * 0.001
+    owned_journal = journal is None
+    if owned_journal:
+        journal = EventJournal(ROOT / "data" / "processed" / "authoritative_risk_journal.sqlite3")
+    try:
+        authoritative = evaluate_authoritative_intent(
+            adapter=adapter, journal=journal, symbol=SYMBOL, mark_price=mid,
+            proposed_signed_quantity_btc=proposed_btc, now_ms=now_ms,
+            market_data_age_seconds=age, kill_switch=KILL.exists())
+    finally:
+        if owned_journal:
+            journal.close()
+    result["authoritative_risk"] = authoritative.to_dict()
+    if authoritative.verdict == "SCALED":
+        # Do not route a scaled BTC quantity through a fixed-contract order API.
+        # Contract conversion and exchange lot sizing must be verified first.
+        result["reason"] = "SCALED_QUANTITY_MAPPING_UNSUPPORTED"
+        return result
+    # This controller routes entry orders only. A REDUCE_ONLY verdict must not
+    # be sent through its non-reduce-only bracket path; a dedicated exit adapter
+    # is required before any exit-only action can be executed.
+    if authoritative.verdict != "APPROVED":
+        result["reason"] = authoritative.reason if authoritative.verdict != "REDUCE_ONLY" else "EXIT_ONLY_ROUTE_UNAVAILABLE"
         return result
 
     plan = plan_for(side, mid, risk_distance)

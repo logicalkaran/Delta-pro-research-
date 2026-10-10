@@ -30,7 +30,9 @@ def audit():
             result = row.get("result", {})
             robust.append(float(result.get("avg_net_bps", -999)) > 0 and float(result.get("profit_factor", -1)) >= 1.2)
     checks["adverse_selection_1bps_robust"] = any(robust)
-    blockers = [k for k,v in checks.items() if not v and k != "promotion_policy_locked" and k != "paper_only"]
+    # A failed paper-only invariant is a hard blocker. Do not exclude it merely
+    # because the current live promotion policy is independently locked.
+    blockers = [k for k, v in checks.items() if not v and k != "promotion_policy_locked"]
     return {
         "status": "PAPER_PRODUCTION_HARDENED" if not blockers else "PAPER_READY_LIVE_BLOCKED",
         "live_orders": False,
