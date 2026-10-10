@@ -5,13 +5,17 @@ Uses bounded in-memory buffers, append-only JSONL, no pandas, no credentials,
 no private endpoints and no execution. A sweep is only a research candidate.
 """
 from __future__ import annotations
-import argparse, json, math, statistics, threading, time, urllib.request
+import argparse, asyncio, json, math, signal, statistics, threading, time, urllib.parse, urllib.request
+from contextlib import ExitStack
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 import websocket
 
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(ROOT))
+from delta_collector.partitioned_raw_writer import PartitionedGzipJSONLWriter
 BASE=ROOT/'data/raw/cross_venue_aligned'
 BINANCE_WS='wss://fstream.binance.com/public/ws/btcusdt@depth@100ms'
 BINANCE_TRADE_WS='wss://fstream.binance.com/market/ws/btcusdt@aggTrade'
@@ -26,15 +30,16 @@ FLOW_QUANTILE=.99
 FLOW_MIN_SAMPLES=600
 FLOW_BASELINE_MAX=18000
 STOP=threading.Event(); LOCK=threading.RLock()
+CAPTURE_ONLY=False
 QUOTES={'binance':None,'delta':None}
 QUOTE_HISTORY={'binance':deque(maxlen=BUFFER_MAX),'delta':deque(maxlen=BUFFER_MAX)}
 FLOW=deque()  # (monotonic, signed BTC quantity, trade price)
 FLOW_BASELINE=deque(maxlen=FLOW_BASELINE_MAX)
 LAST_FLOW_SAMPLE=0.0; LAST_THRESHOLD_REFRESH=0.0; LAST_FLOW_THRESHOLD=None
 PENDING=[]
-COUNTS={'binance_aggTrade':0,'binance_depthUpdate':0,'delta_trades':0,'delta_ob_l1':0,'delta_ob_l2':0,'bad_rows':0,'sequence_gaps':0,'stale_drops':0,'sweep_candidates':0,'labeled_sweeps':0}
+COUNTS={'binance_aggTrade':0,'binance_depthUpdate':0,'delta_trades':0,'delta_ob_l1':0,'delta_ob_l2':0,'bad_rows':0,'sequence_gaps':0,'aggtrade_gaps_detected':0,'aggtrade_backfill_successes':0,'aggtrade_backfill_failures':0,'aggtrade_backfilled_rows':0,'stale_drops':0,'sweep_candidates':0,'labeled_sweeps':0}
 STATUS={'binance':'starting','delta':'starting'}
-OUT_RAW=None; OUT_SWEEPS=None; OUT_LABELS=None; RAW_F=None; SWEEP_F=None; LABEL_F=None
+OUT_RAW=None; OUT_SWEEPS=None; OUT_LABELS=None; RAW_F=None; RAW_WRITER=None; SWEEP_F=None; LABEL_F=None
 TICK_SIZE=.1
 
 def now_iso(): return datetime.now(timezone.utc).isoformat()
@@ -51,14 +56,122 @@ def ts_seconds(x):
 def write_row(f,row):
  f.write(json.dumps(row,separators=(',',':'),allow_nan=False)+'\n')
 def emit_raw(row):
- global RAW_F
- with LOCK: write_row(RAW_F,row)
+ global RAW_WRITER
+ with LOCK:
+  if RAW_WRITER is None:
+   raise RuntimeError('raw gzip partition writer is not initialized')
+  RAW_WRITER.write(row)
 def quote(venue,bid,ask,engine_ts,recv_wall,recv_mono,source):
  if bid is None or ask is None or bid<=0 or ask<bid:return None
  row={'venue':venue,'source':source,'engine_ts_s':ts_seconds(engine_ts),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'bid':bid,'ask':ask,'mid':(bid+ask)/2,'spread_bps':(ask-bid)/((ask+bid)/2)*10000}
  with LOCK:
   QUOTES[venue]=row;QUOTE_HISTORY[venue].append(row)
  return row
+
+def parse_binance_depth(payload: dict) -> dict:
+ """Normalize Binance USD-M depth IDs; research ingestion only, no execution."""
+ return {'exchange':'binance','first_update_id':payload.get('U'),
+         'final_update_id':payload.get('u'),'previous_update_id':payload.get('pu'),
+         'bids':payload.get('b',[]),'asks':payload.get('a',[])}
+
+
+def _fetch_aggtrade_page(from_id: int) -> list:
+ """Fetch one public USD-M aggregate-trade page; never uses credentials."""
+ query=urllib.parse.urlencode({'symbol':'BTCUSDT','fromId':from_id,'limit':1000})
+ request=urllib.request.Request('https://fapi.binance.com/fapi/v1/aggTrades?'+query,
+                                headers={'User-Agent':'btc-fisher-research-capture/1.0'})
+ with urllib.request.urlopen(request,timeout=5) as response:
+  payload=json.loads(response.read().decode('utf-8'))
+ if not isinstance(payload,list):
+  raise ValueError('Unexpected Binance aggTrades response schema')
+ return payload
+
+
+async def backfill_aggtrade_gap(from_id: int, to_id: int) -> tuple[bool,int]:
+ """Backfill a bounded ID interval, preserving canonical schema and source labels.
+
+ Uses async offloading for REST I/O. The capture worker pauses consuming its socket
+ while this runs; queued frames are deduplicated by aggregate trade ID afterward.
+ No automatic retries; unresolved intervals are explicitly archived for audit.
+ """
+ cursor=from_id; written=0; pages=0
+ while cursor<=to_id and pages<10:
+  page=await asyncio.to_thread(_fetch_aggtrade_page,cursor); pages+=1
+  if not page: break
+  progressed=False
+  for trade in page:
+   try: tid=int(trade['a'])
+   except (KeyError,TypeError,ValueError): continue
+   if tid<cursor: continue
+   if tid>cursor: return False,written
+   price=num(trade.get('p')); qty=num(trade.get('q')); maker=trade.get('m')
+   if price is None or qty is None or maker is None: return False,written
+   recv_wall=time.time(); recv_mono=time.monotonic()
+   emit_raw({'venue':'binance','kind':'aggTrade','symbol':'BTCUSDT',
+    'engine_event_ts_s':None,'engine_transaction_ts_s':ts_seconds(trade.get('T')),
+    'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,
+    'trade_id':tid,'price':price,'quantity_btc':qty,
+    'aggressor_side':'SELL' if maker else 'BUY','buyer_is_maker':maker,
+    'book_synced':STATUS.get('binance')=='connected_synced','is_backfilled':True,
+    'backfill_source':'binance_futures_rest_aggTrades'})
+   written+=1; cursor=tid+1; progressed=True
+   if cursor>to_id: break
+  if cursor>to_id: break
+  if not progressed: break
+ return cursor>to_id,written
+
+
+class BinanceTradeHealer:
+ """Research-only aggregate-trade sequence watcher; no trading or order access."""
+ def __init__(self): self.expected_a=None
+
+ def process_live_trade(self, payload: dict) -> None:
+  current=payload.get('a')
+  if not isinstance(current,int):
+   try: current=int(current)
+   except (TypeError,ValueError):
+    with LOCK: COUNTS['bad_rows']+=1
+    return
+  if self.expected_a is not None and current<self.expected_a:
+   # REST backfill or a reconnect may cause buffered duplicate stream frames.
+   return
+  if self.expected_a is not None and current>self.expected_a:
+   start=self.expected_a; end=current-1
+   with LOCK: COUNTS['aggtrade_gaps_detected']+=1
+   try:
+    complete,written=asyncio.run(backfill_aggtrade_gap(start,end))
+   except Exception as exc:
+    complete=False; written=0
+    error=type(exc).__name__
+   else: error=None
+   with LOCK:
+    COUNTS['aggtrade_backfilled_rows']+=written
+    if complete: COUNTS['aggtrade_backfill_successes']+=1
+    else:
+     COUNTS['aggtrade_backfill_failures']+=1
+     emit_raw({'venue':'binance','kind':'aggTrade_gap','symbol':'BTCUSDT',
+      'gap_start_id':start,'gap_end_id':end,'detected_at_utc':now_iso(),
+      'backfill_status':'INCOMPLETE','backfilled_rows':written,
+      'error_type':error,'research_only':True,'real_orders':False})
+  # The live frame follows the gap interval even if REST backfill fails; the marker preserves the unresolved gap.
+  self.expected_a=current
+  recv_wall=time.time(); recv_mono=time.monotonic()
+  price=num(payload.get('p')); qty=num(payload.get('q')); maker=payload.get('m')
+  if price is None or qty is None or maker is None:
+   with LOCK: COUNTS['bad_rows']+=1
+   self.expected_a=current+1
+   return
+  with LOCK:
+   COUNTS['binance_aggTrade']+=1
+   if not CAPTURE_ONLY: FLOW.append((recv_mono,(-1 if maker else 1)*qty,price))
+  emit_raw({'venue':'binance','kind':'aggTrade','symbol':'BTCUSDT',
+   'engine_event_ts_s':ts_seconds(payload.get('E')),'engine_transaction_ts_s':ts_seconds(payload.get('T')),
+   'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,
+   'trade_id':current,'price':price,'quantity_btc':qty,
+   'aggressor_side':'SELL' if maker else 'BUY','buyer_is_maker':maker,
+   'book_synced':STATUS.get('binance')=='connected_synced','is_backfilled':False,
+   'backfill_source':'websocket'})
+  self.expected_a=current+1
 
 def depth_snapshot_bridge(first_u,final_u,last_update_id):
  return int(first_u)<=int(last_update_id)<=int(final_u)
@@ -163,11 +276,13 @@ def binance_worker():
      if kind=='aggTrade':
       price=num(d.get('p'));qty=num(d.get('q'));maker=d.get('m');side=-1 if maker else 1
       if price is None or qty is None:continue
-      with LOCK:FLOW.append((recv_mono,side*qty,price));COUNTS['binance_aggTrade']+=1
+      with LOCK:
+       COUNTS['binance_aggTrade']+=1
+       if not CAPTURE_ONLY: FLOW.append((recv_mono,side*qty,price))
       row={'venue':'binance','kind':'aggTrade','symbol':'BTCUSDT','engine_event_ts_s':ts_seconds(d.get('E')),'engine_transaction_ts_s':ts_seconds(d.get('T')),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'trade_id':d.get('a'),'price':price,'quantity_btc':qty,'aggressor_side':'SELL' if maker else 'BUY','buyer_is_maker':maker,'book_synced':synced}
       emit_raw(row);continue
      if kind!='depthUpdate':continue
-     U=int(d['U']);u=int(d['u'])
+     depth=parse_binance_depth(d); U=int(depth['first_update_id']);u=int(depth['final_update_id'])
      if u<=last_id:continue
      if not synced:
       if u<last_id:continue
@@ -176,7 +291,7 @@ def binance_worker():
        with LOCK:COUNTS['sequence_gaps']+=1;STATUS['binance']='depth_sequence_gap_resnapshot'
        ws.close();ws=None;break
       synced=True
-     elif not depth_event_follows(previous_u,d.get('pu')):
+     elif not depth_event_follows(previous_u,depth['previous_update_id']):
       with LOCK:COUNTS['sequence_gaps']+=1;STATUS['binance']='depth_sequence_gap_resnapshot'
       ws.close();ws=None;break
      old_bid=max(bids) if bids else None;old_ask=min(asks) if asks else None
@@ -193,8 +308,11 @@ def binance_worker():
      q=quote('binance',best_bid,best_ask,d.get('T') or d.get('E'),recv_wall,recv_mono,'depthUpdate')
      if q is None:continue
      with LOCK:COUNTS['binance_depthUpdate']+=1;STATUS['binance']='connected_synced'
-     row={'venue':'binance','kind':'depthUpdate','symbol':'BTCUSDT','engine_event_ts_s':ts_seconds(d.get('E')),'engine_transaction_ts_s':ts_seconds(d.get('T')),'receive_epoch_s':recv_wall,'receive_utc':q['receive_utc'],'receive_mono_s':recv_mono,'first_update_id':U,'final_update_id':u,'best_bid':best_bid,'best_ask':best_ask,'mid':q['mid'],'spread_bps':q['spread_bps'],'bid_depth_top10_btc':sum(bids[p] for p in sorted(bids,reverse=True)[:10]),'ask_depth_top10_btc':sum(asks[p] for p in sorted(asks)[:10]),'book_synced':True,'tick_size':TICK_SIZE}
-     emit_raw(row);maybe_sweep(recv_mono,recv_wall,d.get('T') or d.get('E'),old_bid,old_ask,best_bid,best_ask);update_pending(recv_mono)
+     bid_prices=sorted(bids,reverse=True)[:5];ask_prices=sorted(asks)[:5]
+     row={'venue':'binance','kind':'depthUpdate','symbol':'BTCUSDT','engine_event_ts_s':ts_seconds(d.get('E')),'engine_transaction_ts_s':ts_seconds(d.get('T')),'receive_epoch_s':recv_wall,'receive_utc':q['receive_utc'],'receive_mono_s':recv_mono,'first_update_id':U,'final_update_id':u,'previous_update_id':depth['previous_update_id'],'best_bid':best_bid,'best_ask':best_ask,'mid':q['mid'],'spread_bps':q['spread_bps'],'bid_depth_top10_btc':sum(bids[p] for p in sorted(bids,reverse=True)[:10]),'ask_depth_top10_btc':sum(asks[p] for p in sorted(asks)[:10]),'bid_levels_top5_btc':[[p,bids[p]] for p in bid_prices],'ask_levels_top5_btc':[[p,asks[p]] for p in ask_prices],'book_synced':True,'tick_size':TICK_SIZE}
+     emit_raw(row)
+     if not CAPTURE_ONLY:
+      maybe_sweep(recv_mono,recv_wall,d.get('T') or d.get('E'),old_bid,old_ask,best_bid,best_ask);update_pending(recv_mono)
     except Exception:
      with LOCK:COUNTS['bad_rows']+=1
   except Exception as e:
@@ -206,6 +324,7 @@ def binance_worker():
    except Exception:pass
 
 def binance_trade_worker():
+ healer=BinanceTradeHealer()
  while not STOP.is_set():
   ws=None
   try:
@@ -218,11 +337,8 @@ def binance_trade_worker():
     try:
      d=json.loads(raw)
      if d.get('e')!='aggTrade':continue
-     price=num(d.get('p'));qty=num(d.get('q'));maker=d.get('m')
-     if price is None or qty is None or maker is None:continue
-     side=-1 if maker else 1
-     with LOCK:FLOW.append((recv_mono,side*qty,price));COUNTS['binance_aggTrade']+=1;STATUS['binance_trades']='connected'
-     emit_raw({'venue':'binance','kind':'aggTrade','symbol':'BTCUSDT','engine_event_ts_s':ts_seconds(d.get('E')),'engine_transaction_ts_s':ts_seconds(d.get('T')),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'trade_id':d.get('a'),'price':price,'quantity_btc':qty,'aggressor_side':'SELL' if maker else 'BUY','buyer_is_maker':maker,'book_synced':STATUS.get('binance')=='connected_synced'})
+     healer.process_live_trade(d)
+     with LOCK: STATUS['binance_trades']='connected'
     except Exception:
      with LOCK:COUNTS['bad_rows']+=1
   except Exception as e:
@@ -254,17 +370,18 @@ def delta_worker():
       if bids and asks:bid=num(bids[0][0]);ask=num(asks[0][0])
      elif typ=='trades':
       with LOCK:COUNTS['delta_trades']+=1
-      row={'venue':'delta','kind':'trade','symbol':SYMBOL,'engine_trade_ts_s':ts_seconds(d.get('t')),'feed_ts_s':ts_seconds(d.get('ts')),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'price':num(d.get('p')),'quantity_contract_units':num(d.get('s')),'role':d.get('r'),'raw_side_semantics':'preserved_as_exchange_role_field_not_assumed','research_only':True}
+      row={'venue':'delta','kind':'trade','symbol':SYMBOL,'sequence':next((d.get(k) for k in ('sequence','seq','sequence_number','update_id','u') if d.get(k) is not None),None),'engine_trade_ts_s':ts_seconds(d.get('t')),'feed_ts_s':ts_seconds(d.get('ts')),'receive_epoch_s':recv_wall,'receive_utc':now_iso(),'receive_mono_s':recv_mono,'price':num(d.get('p')),'quantity_contract_units':num(d.get('s')),'role':d.get('r'),'raw_side_semantics':'preserved_as_exchange_role_field_not_assumed','research_only':True}
       emit_raw(row);continue
      q=quote('delta',bid,ask,engine_ts,recv_wall,recv_mono,typ)
      if q is None:continue
      if typ=='ob_l1':
       with LOCK:COUNTS['delta_ob_l1']+=1
-      row={'venue':'delta','kind':'ob_l1','symbol':SYMBOL,'engine_ts_s':q['engine_ts_s'],'receive_epoch_s':recv_wall,'receive_utc':q['receive_utc'],'receive_mono_s':recv_mono,'best_bid':bid,'best_ask':ask,'mid':q['mid'],'spread_bps':q['spread_bps'],'bid_size':num(d.get('bs')),'ask_size':num(d.get('as'))}
+      row={'venue':'delta','kind':'ob_l1','symbol':SYMBOL,'sequence':next((d.get(k) for k in ('sequence','seq','sequence_number','update_id','u') if d.get(k) is not None),None),'engine_ts_s':q['engine_ts_s'],'receive_epoch_s':recv_wall,'receive_utc':q['receive_utc'],'receive_mono_s':recv_mono,'best_bid':bid,'best_ask':ask,'mid':q['mid'],'spread_bps':q['spread_bps'],'bid_size':num(d.get('bs')),'ask_size':num(d.get('as'))}
      else:
       with LOCK:COUNTS['delta_ob_l2']+=1
-      row={'venue':'delta','kind':'ob_l2_snapshot','symbol':SYMBOL,'engine_ts_s':q['engine_ts_s'],'receive_epoch_s':recv_wall,'receive_utc':q['receive_utc'],'receive_mono_s':recv_mono,'best_bid':bid,'best_ask':ask,'mid':q['mid'],'spread_bps':q['spread_bps'],'bid_levels':(d.get('b') or [])[:20],'ask_levels':(d.get('a') or [])[:20]}
-     emit_raw(row);update_pending(recv_mono)
+      row={'venue':'delta','kind':'ob_l2_snapshot','symbol':SYMBOL,'sequence':next((d.get(k) for k in ('sequence','seq','sequence_number','update_id','u') if d.get(k) is not None),None),'engine_ts_s':q['engine_ts_s'],'receive_epoch_s':recv_wall,'receive_utc':q['receive_utc'],'receive_mono_s':recv_mono,'best_bid':bid,'best_ask':ask,'mid':q['mid'],'spread_bps':q['spread_bps'],'bid_levels':(d.get('b') or [])[:20],'ask_levels':(d.get('a') or [])[:20]}
+     emit_raw(row)
+     if not CAPTURE_ONLY: update_pending(recv_mono)
     except Exception:
      with LOCK:COUNTS['bad_rows']+=1
   except Exception as e:
@@ -275,33 +392,62 @@ def delta_worker():
    except Exception:pass
 
 def main():
- global OUT_RAW,OUT_SWEEPS,OUT_LABELS,RAW_F,SWEEP_F,LABEL_F
- ap=argparse.ArgumentParser();ap.add_argument('--duration-seconds',type=int,default=600);args=ap.parse_args()
+ global OUT_RAW,OUT_SWEEPS,OUT_LABELS,RAW_F,RAW_WRITER,SWEEP_F,LABEL_F,CAPTURE_ONLY
+ ap=argparse.ArgumentParser(description='Research-only cross-venue capture; no order execution.')
+ ap.add_argument('--duration-seconds',type=int,default=600)
+ ap.add_argument('--archive-only',action='store_true',help='write raw gzip partitions only; disable all online research evaluation')
+ args=ap.parse_args()
+ if args.duration_seconds<1: ap.error('--duration-seconds must be >= 1')
+ CAPTURE_ONLY=args.archive_only
+ # SIGTERM requests a cooperative shutdown so workers stop before gzip trailers are written.
+ signal.signal(signal.SIGTERM, lambda *_: STOP.set())
  BASE.mkdir(parents=True,exist_ok=True);stamp=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
- OUT_RAW=BASE/f'cross_venue_ticks_{stamp}.jsonl';OUT_SWEEPS=BASE/f'cross_venue_sweeps_{stamp}.jsonl';OUT_LABELS=BASE/f'cross_venue_labels_{stamp}.jsonl'
- with OUT_RAW.open('a',encoding='utf-8',buffering=1) as RAW_F, OUT_SWEEPS.open('a',encoding='utf-8',buffering=1) as SWEEP_F, OUT_LABELS.open('a',encoding='utf-8',buffering=1) as LABEL_F:
-  threads=[threading.Thread(target=binance_worker,daemon=True),threading.Thread(target=binance_trade_worker,daemon=True),threading.Thread(target=delta_worker,daemon=True)]
-  for t in threads:t.start()
-  start=time.monotonic();last_flush=start
-  try:
-   while time.monotonic()-start<args.duration_seconds:
-    now=time.monotonic();update_pending(now)
-    if now-last_flush>=1:
-     RAW_F.flush();SWEEP_F.flush();LABEL_F.flush();last_flush=now
-    time.sleep(.05)
-  except KeyboardInterrupt:pass
-  finally:
-   # Keep feeds alive after the nominal capture window so final sweep candidates
-   # can complete the predeclared 1s-buffer + 30s outcome horizon.
-   drain_start=time.monotonic();last_flush=time.monotonic()
-   while PENDING and time.monotonic()-drain_start<32.0:
-    now=time.monotonic();update_pending(now)
-    if now-last_flush>=1.0:
-     RAW_F.flush();SWEEP_F.flush();LABEL_F.flush();last_flush=now
-    time.sleep(.05)
-   STOP.set()
-   for t in threads:t.join(timeout=3)
-   RAW_F.flush();SWEEP_F.flush();LABEL_F.flush()
- report={'schema':'cross_venue_aligned_capture_report_v1','started_at_utc':stamp,'finished_at_utc':now_iso(),'duration_requested_seconds':args.duration_seconds,'mode':'PUBLIC_RESEARCH_CAPTURE_ONLY','post_capture_label_drain_max_seconds':32,'binance_symbol':'BTCUSDT USD-M perpetual','delta_symbol':SYMBOL+' Delta India perpetual','raw_path':str(OUT_RAW.relative_to(ROOT)),'sweeps_path':str(OUT_SWEEPS.relative_to(ROOT)),'labels_path':str(OUT_LABELS.relative_to(ROOT)),'counts':COUNTS,'status':STATUS,'tick_size':TICK_SIZE,'buffers':{'per_venue_quote_history_max':BUFFER_MAX,'trade_flow_window_seconds':FLOW_WINDOW_S,'flow_baseline_max_samples':FLOW_BASELINE_MAX},'sweep_rule':{'window_seconds':FLOW_WINDOW_S,'flow_quantile':FLOW_QUANTILE,'minimum_baseline_samples':FLOW_MIN_SAMPLES,'levels':SWEEP_LEVELS,'requires_distinct_aggressive_trade_prices':3,'buffer_seconds':1,'horizons_seconds':[5,15,30]},'timestamp_policy':'Preserve engine event/transaction timestamps and local receive wall/monotonic times separately. Cross-venue engine clocks are not assumed synchronized. Outcomes are receive-time actionable labels after a 1s buffer.','real_orders':False,'private_api':False,'credentials_used':False,'execution_enabled':False,'qwen_enabled':False,'notes':['Binance book only becomes eligible after diff-depth sequence synchronization.','Sweep candidates are observational and not proof of passive fill or profitable transmission.','Delta trade size is preserved as exchange contract units, not assumed BTC.','Depth/top-of-book units and contract multiplier require explicit instrument-spec verification before economic interpretation.']}
+ session_id=f'cross_venue_{stamp}'
+ OUT_SWEEPS=None if CAPTURE_ONLY else BASE/f'cross_venue_sweeps_{stamp}.jsonl'
+ OUT_LABELS=None if CAPTURE_ONLY else BASE/f'cross_venue_labels_{stamp}.jsonl'
+ RAW_WRITER=PartitionedGzipJSONLWriter(BASE,session_id=session_id,max_part_bytes=16*1024*1024,compresslevel=4)
+ OUT_RAW=RAW_WRITER.current_path
+ threads=[]
+ try:
+  with ExitStack() as stack:
+   if not CAPTURE_ONLY:
+    SWEEP_F=stack.enter_context(OUT_SWEEPS.open('x',encoding='utf-8',buffering=1))
+    LABEL_F=stack.enter_context(OUT_LABELS.open('x',encoding='utf-8',buffering=1))
+   else:
+    SWEEP_F=LABEL_F=None
+   threads=[threading.Thread(target=binance_worker,daemon=True),threading.Thread(target=binance_trade_worker,daemon=True),threading.Thread(target=delta_worker,daemon=True)]
+   for t in threads:t.start()
+   start=time.monotonic();last_flush=start
+   try:
+    while time.monotonic()-start<args.duration_seconds and not STOP.is_set():
+     now=time.monotonic()
+     if not CAPTURE_ONLY: update_pending(now)
+     if now-last_flush>=1:
+      with LOCK: RAW_WRITER.flush()
+      if not CAPTURE_ONLY: SWEEP_F.flush();LABEL_F.flush()
+      last_flush=now
+     time.sleep(.05)
+   except KeyboardInterrupt:pass
+   finally:
+    if not CAPTURE_ONLY:
+     # Drain final candidate labels, then stop workers before closing the gzip writer.
+     drain_start=time.monotonic();last_flush=time.monotonic()
+     while PENDING and time.monotonic()-drain_start<32.0 and not STOP.is_set():
+      now=time.monotonic();update_pending(now)
+      if now-last_flush>=1.0:
+       with LOCK: RAW_WRITER.flush()
+       SWEEP_F.flush();LABEL_F.flush();last_flush=now
+      time.sleep(.05)
+    STOP.set()
+    for t in threads:t.join(timeout=5)
+    if not CAPTURE_ONLY:
+     SWEEP_F.flush();LABEL_F.flush()
+ finally:
+  STOP.set()
+  for t in threads:
+   if t.is_alive(): t.join(timeout=5)
+  if RAW_WRITER is not None: RAW_WRITER.close()
+ raw_parts=sorted(BASE.glob(f'session_{session_id}_part_*.jsonl.gz'))
+ report={'schema':'cross_venue_aligned_capture_report_v1','started_at_utc':stamp,'finished_at_utc':now_iso(),'duration_requested_seconds':args.duration_seconds,'mode':'PUBLIC_RESEARCH_CAPTURE_ONLY','archive_only':CAPTURE_ONLY,'post_capture_label_drain_max_seconds':0 if CAPTURE_ONLY else 32,'binance_symbol':'BTCUSDT USD-M perpetual','delta_symbol':SYMBOL+' Delta India perpetual','raw_path':str(raw_parts[0].relative_to(ROOT)) if raw_parts else None,'raw_partition_paths':[str(p.relative_to(ROOT)) for p in raw_parts],'raw_format':'append-only gzip JSONL partitions; 16 MiB uncompressed target per partition; compression level 4','sweeps_path':str(OUT_SWEEPS.relative_to(ROOT)) if OUT_SWEEPS else None,'labels_path':str(OUT_LABELS.relative_to(ROOT)) if OUT_LABELS else None,'counts':COUNTS,'status':STATUS,'tick_size':TICK_SIZE,'buffers':{'per_venue_quote_history_max':BUFFER_MAX,'trade_flow_window_seconds':FLOW_WINDOW_S,'flow_baseline_max_samples':FLOW_BASELINE_MAX},'sweep_rule':None if CAPTURE_ONLY else {'window_seconds':FLOW_WINDOW_S,'flow_quantile':FLOW_QUANTILE,'minimum_baseline_samples':FLOW_MIN_SAMPLES,'levels':SWEEP_LEVELS,'requires_distinct_aggressive_trade_prices':3,'buffer_seconds':1,'horizons_seconds':[5,15,30]},'timestamp_policy':'Preserve exchange event/transaction timestamps separately from local receive wall/monotonic timestamps; exchange clocks are not assumed synchronized.','real_orders':False,'private_api':False,'credentials_used':False,'execution_enabled':False,'qwen_enabled':False,'notes':['Raw capture is append-only gzip JSONL with exclusive file creation and 16 MiB uncompressed target partitions.','Archive-only mode disables sweep candidate generation and outcome labeling; research evaluation is offline.','Clean shutdown finalizes gzip trailers; sudden SIGKILL or power loss can still leave the active partition incomplete.','Delta trade size is preserved as exchange contract units, not assumed BTC.','Binance aggregate-trade gaps are backfilled from public REST in bounded pages; unresolved gaps are recorded as aggTrade_gap rows and must fail the offline audit.','First observed aggregate-trade ID has no known prior boundary, so completeness before the first observed ID cannot be proven.']}
  report_path=BASE/f'cross_venue_capture_report_{stamp}.json';report_path.write_text(json.dumps(report,indent=2,allow_nan=False));print(json.dumps(report,indent=2),flush=True)
 if __name__=='__main__':main()

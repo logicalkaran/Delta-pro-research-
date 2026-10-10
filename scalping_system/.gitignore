@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+
+# Runtime / market data (never version generated market streams)
+data/runtime_state.json
+data/paper_trades.json
+data/live_*.json
+data/raw/
+data/processed/
+data/run/
+*.tmp
+
+# Logs
+logs/
+*.log
+
+# Local test artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+data/test_artifacts/
+
+# Termux / editor artifacts
+*.swp
+*.swo
+*~
+
+# OS/editor
+.DS_Store
+Thumbs.db

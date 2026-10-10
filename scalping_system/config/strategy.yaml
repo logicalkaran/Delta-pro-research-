@@ -1,0 +1,46 @@
+strategy:
+  name: btc_monthly_fisher_v1
+  enabled: true
+
+  source: HL2
+  length: 10
+  alpha: 0.33
+  beta: 0.67
+
+  confirmation:
+    timeframe: 1M
+    require_closed_candle: true
+    entry: next_month_open
+
+risk:
+  live_trading: false
+  paper_trading: true
+
+  max_positions: 1
+
+  max_position_notional_inr: 5000
+
+  max_daily_loss_inr: 250
+
+  max_order_notional_inr: 5000
+
+  kill_switch: true
+
+execution:
+  order_type: market
+  reduce_only: false
+
+  max_slippage_bps: 100
+
+  duplicate_signal_protection: true
+
+monitoring:
+  telegram: false
+
+research:
+  primary_horizon_months: 3
+  secondary_horizons:
+    - 1
+    - 6
+
+  transaction_cost_bps: 30

@@ -1,0 +1,137 @@
+{
+  "observations": 6931,
+  "signals": 1113,
+  "level_blocks": 556,
+  "risk_blocks": 550,
+  "entries": 7,
+  "trades": 6,
+  "wins": 1,
+  "losses": 5,
+  "stops": 5,
+  "targets": 1,
+  "timeouts": 0,
+  "stale_blocks": 0,
+  "kill_blocks": 0,
+  "sum_net_usd": -0.45868068500001236,
+  "duration_s": 1800.195,
+  "win_rate": 0.16666666666666666,
+  "avg_net_bps": -9.235133333333332,
+  "profit_factor": 0.027090426082941054,
+  "expectancy_bps": -9.235133333333332,
+  "open_position": {
+    "side": "SHORT",
+    "entry": 82901.5,
+    "stop": 82936.5,
+    "target": 82794.5,
+    "risk_per_btc": 35.1103,
+    "rr": 3.053,
+    "atr": 66.3212,
+    "support": 82794.31,
+    "resistance": 82920.03,
+    "poc": 83220.03125,
+    "value_low": 82942.65625,
+    "value_high": 83477.59375,
+    "regime": "LOW_VOLATILITY",
+    "opened_at": 1791437145.1841016,
+    "levels": {
+      "price": 82901.25,
+      "atr": 46.0,
+      "atr_pct": 0.0555,
+      "support": [
+        {
+          "price": 82794.31,
+          "kind": "SUPPORT",
+          "strength": 100.0,
+          "distance_bps": -12.9,
+          "evidence": [
+            "SWING_LOW",
+            "SWING_HIGH"
+          ]
+        },
+        {
+          "price": 82680.18,
+          "kind": "SUPPORT",
+          "strength": 100.0,
+          "distance_bps": -26.67,
+          "evidence": [
+            "SWING_HIGH",
+            "SWING_LOW"
+          ]
+        },
+        {
+          "price": 82584.62,
+          "kind": "SUPPORT",
+          "strength": 100.0,
+          "distance_bps": -38.19,
+          "evidence": [
+            "SWING_LOW",
+            "SWING_HIGH"
+          ]
+        }
+      ],
+      "resistance": [
+        {
+          "price": 82920.03,
+          "kind": "RESISTANCE",
+          "strength": 100.0,
+          "distance_bps": 2.27,
+          "evidence": [
+            "SWING_LOW",
+            "BID_LIQUIDITY",
+            "ASK_LIQUIDITY",
+            "SWING_HIGH",
+            "VALUE_LOW"
+          ]
+        },
+        {
+          "price": 83210.39,
+          "kind": "RESISTANCE",
+          "strength": 100.0,
+          "distance_bps": 37.29,
+          "evidence": [
+            "SWING_LOW",
+            "SWING_HIGH",
+            "POC_HVN"
+          ]
+        },
+        {
+          "price": 83350.1,
+          "kind": "RESISTANCE",
+          "strength": 100.0,
+          "distance_bps": 54.14,
+          "evidence": [
+            "SWING_HIGH",
+            "SWING_LOW"
+          ]
+        },
+        {
+          "price": 83439.75,
+          "kind": "RESISTANCE",
+          "strength": 100.0,
+          "distance_bps": 64.96,
+          "evidence": [
+            "SWING_HIGH",
+            "SWING_LOW",
+            "VALUE_HIGH"
+          ]
+        }
+      ],
+      "nearest_support": 82794.31,
+      "nearest_resistance": 82920.03,
+      "value_low": 82942.65625,
+      "poc": 83220.03125,
+      "value_high": 83477.59375,
+      "regime": "LOW_VOLATILITY"
+    },
+    "signal_reason": "BUY_ABSORPTION"
+  },
+  "status": "PAPER_ONLY",
+  "real_orders": false,
+  "promotion": "BLOCKED",
+  "predictive_support_resistance": true,
+  "risk_model": "1pct_reference; ATR-capped; min_RR_1.5",
+  "fee_model": {
+    "maker_bps": 2.36,
+    "taker_bps": 5.9
+  }
+}

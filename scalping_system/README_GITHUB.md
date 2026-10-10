@@ -23,3 +23,7 @@ python -m unittest research.test_delta_market_data_harvester_v1 research.test_de
 ```
 
 The latest focused validation for the new public data/feature and read-only margin components passed 36 tests on 2026-10-09. That is a code/test result, not evidence of positive trading expectancy.
+
+## Engineering / safety status
+
+See [PRODUCTION_ENGINE_STATUS.md](PRODUCTION_ENGINE_STATUS.md) for the current architecture, test commands, limitations, and explicit live-trading blockers. The repository is a research/paper system; real order submission remains disabled and promotion remains blocked. Reported paper metrics are negative and statistically insufficient, so this is not represented as a profitable or production-approved trading service.
