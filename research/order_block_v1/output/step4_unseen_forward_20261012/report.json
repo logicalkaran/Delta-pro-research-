@@ -1,0 +1,38 @@
+{
+  "experiment": "step4_fixed_rule_unseen_forward_check",
+  "research_only": true,
+  "live_execution_enabled": false,
+  "symbol": "BTCUSD",
+  "timeframe": "15m",
+  "fixed_min_risk_bps": 60.0,
+  "fee_bps_per_side": 5.0,
+  "slippage_bps_per_side": 2.0,
+  "threshold_tuned_on_forward_period": false,
+  "historical_source_sha256": "2d95db5bb3ce3161ededf827be5fad309f7d0c6f51b191f33832add2f5a3c5ab",
+  "historical_cutoff_utc": "2026-10-10T23:00:00+00:00",
+  "fresh_candles": 183,
+  "fresh_first_utc": "2026-10-10T23:15:00+00:00",
+  "fresh_last_utc": "2026-10-12T20:45:00+00:00",
+  "fresh_csv_sha256": "4e5fbc53da530f891d4420e055da2cb8996fb92eef94beef23fc07fa12cd8dbd",
+  "fresh_interval_gaps_in_combined_history": 0,
+  "forward_trades_entered_after_cutoff": 0,
+  "forward_metrics": {
+    "trades": 0,
+    "win_rate": null,
+    "gross_expectancy_r": null,
+    "gross_profit_factor": null,
+    "net_expectancy_r": null,
+    "net_profit_factor": null,
+    "avg_cost_r": null,
+    "avg_risk_bps": null,
+    "net_total_r": 0.0,
+    "max_drawdown_r": 0.0,
+    "long_trades": 0,
+    "short_trades": 0
+  },
+  "warnings": [
+    "Fewer than 30 forward trades; no reliable edge inference.",
+    "Forward net expectancy is absent or non-positive; do not promote.",
+    "Forward net profit factor is absent or <= 1; do not promote."
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schema":"pro_scalper_v6_config","research_only":true,"real_orders":false,
+  "paper_notional_usd":100.0,"max_fresh_seconds":2.0,"max_spread_bps":4.0,
+  "min_net_edge_bps":1.0,"min_empirical_edge_bps":6.0,"max_hold_seconds":120,
+  "paper_target_bps":20.0,"paper_stop_bps":10.0,"maker_fill_probability":0.30,
+  "maker_queue_fraction":0.50,"maker_adverse_selection_bps":1.5,"taker_slippage_bps":1.0,
+  "funding_interval_seconds":28800,
+  "promotion_requirements":{"completed_trades":100,"profit_factor":1.2,"win_rate":0.52,"avg_net_bps":0.5,"positive_both_halves":true},
+  "venue":{"name":"Delta Exchange India","symbol":"BTCUSD","lot_size_btc":0.001,"tick_size_usd":0.5,
+    "maker_fee_bps":2.0,"taker_fee_bps":5.0,"gst":0.18,"effective_maker_bps":2.36,"effective_taker_bps":5.90,
+    "funding_interval_hours":8,"source":"https://www.delta.exchange/fees","contracts":"https://prod-mobile-india.delta.exchange/contracts","retrieved":"2026-10-09"}
+}

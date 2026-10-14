@@ -51,6 +51,30 @@ def tf_signal(rows):
  sig="BUY" if score>=2 else ("SELL" if score<=-2 else "HOLD")
  conf=min(99,50+abs(score)*12+min(abs(rr-50),15))
  return {"signal":sig,"confidence":round(conf),"price":closes[-1],"ema20":e20,"ema50":e50,"rsi14":rr,"return_pct":ret,"score":score,"candles":len(closes)}
+def candle_patterns(rows):
+ rows=sorted(rows,key=lambda x:x.get("time",0)); out=[]
+ for i,r in enumerate(rows):
+  try:
+   o,h,l,c=map(float,(r["open"],r["high"],r["low"],r["close"])); rng=max(h-l,1e-9); body=abs(c-o); upper=h-max(o,c); lower=min(o,c)-l
+   bull=c>o; prev=rows[i-1] if i else None; p=None
+   if body/rng<0.12:p="DOJI"
+   elif lower>=body*2.0 and upper<=body*0.8 and bull:p="HAMMER"
+   elif upper>=body*2.0 and lower<=body*0.8 and not bull:p="SHOOTING_STAR"
+   elif prev:
+    po,pc=float(prev["open"]),float(prev["close"])
+    if bull and pc<po and c>po and o<pc:p="BULLISH_ENGULFING"
+    elif (not bull) and pc>po and c<po and o>pc:p="BEARISH_ENGULFING"
+   if p: out.append({"time":r.get("time"),"pattern":p,"side":"BUY" if p in ("HAMMER","BULLISH_ENGULFING") else "SELL" if p in ("SHOOTING_STAR","BEARISH_ENGULFING") else "NEUTRAL","price":c})
+  except Exception: pass
+ return out[-30:]
+def chart_markers(rows):
+ rows=sorted(rows,key=lambda x:x.get("time",0)); markers=[]
+ for i in range(55,len(rows)):
+  w=rows[:i+1]
+  s=tf_signal(w)
+  if s.get("signal") in ("BUY","SELL"):
+   markers.append({"time":rows[i].get("time"),"side":s["signal"],"price":float(rows[i]["low"] if s["signal"]=="BUY" else rows[i]["high"]),"confidence":s.get("confidence",0),"score":s.get("score",0)})
+ return markers[-40:]
 def refresh_perpetuals():
  rows=perpetuals(); ticks=perp_tickers()
  merged=[]
@@ -61,9 +85,9 @@ def refresh():
  started=time.time(); out={};charts={};errors={}
  def fetch(res):
   try:
-   rows=candles(res);return res,tf_signal(rows),rows[-120:],None
+   rows=candles(res);return res,tf_signal(rows),{"candles":rows[-120:],"markers":chart_markers(rows),"patterns":candle_patterns(rows)},None
   except Exception as e:
-   return res,{"signal":"HOLD","confidence":0,"reason":"feed unavailable","error":type(e).__name__+":"+str(e)[:120]},[],type(e).__name__+":"+str(e)[:120]
+   return res,{"signal":"HOLD","confidence":0,"reason":"feed unavailable","error":type(e).__name__+":"+str(e)[:120]},{"candles":[],"markers":[],"patterns":[]},type(e).__name__+":"+str(e)[:120]
  with ThreadPoolExecutor(max_workers=3) as pool:
   for res,sig,rows,err in pool.map(fetch,("1m","5m","1h")):
    out[res]=sig;charts[res]=rows
@@ -106,9 +130,21 @@ class H(http.server.BaseHTTPRequestHandler):
    micro=rd("data/live_microstructure_state.json"); now=time.time(); q=micro.get("quality",{}); updated=float(micro.get("updated_at_epoch",0) or 0); file_age=(now-(os.path.getmtime(ROOT+"/data/live_microstructure_state.json") if os.path.exists(ROOT+"/data/live_microstructure_state.json") else 0)); event_fresh=float(q.get("fresh_seconds",999) if q.get("fresh_seconds") is not None else 999); state_age=max(0.0,now-updated) if updated else file_age; stale=state_age>6.0 or file_age>6.0 or event_fresh>6.0
    meta.update({"micro_event_fresh_s":round(event_fresh,3),"micro_state_age_s":round(state_age,3),"micro_file_age_s":round(file_age,3),"micro_stale":stale})
    self.send_json({"micro":micro,"cross":latest_cross(),"paper":rd("data/processed/professional_paper_v1_summary.json"),"timeframes":tf,"health":meta});return
+  if path=="/api/patterns":
+   with LOCK: tf=json.loads(json.dumps(CACHE["data"].get("_charts",{})))
+   self.send_json({"timeframes":{k:{"patterns":v.get("patterns",[]),"markers":v.get("markers",[])} for k,v in tf.items()},"updated_at":time.time(),"paper_only":True});return
   if path=="/api/perpetuals":
    with LOCK:rows=json.loads(json.dumps(CACHE["perpetuals"]));age=round(time.time()-CACHE["perp_ts"],2) if CACHE["perp_ts"] else None
    self.send_json({"products":rows,"count":len([x for x in rows if x.get("symbol")]),"cache_age_s":age});return
+  if path=="/api/absorption":
+   summary=rd("data/processed/institutional_absorption_monitor_v2_state.json")
+   latest={}
+   try:
+    with open(ROOT+"/data/processed/institutional_absorption_monitor_v2.jsonl") as f:
+     ls=f.readlines(); latest=json.loads(ls[-1]) if ls else {}
+   except: pass
+   analytics=rd("data/processed/institutional_absorption_validation_v2.json")
+   self.send_json({"summary":summary,"latest":latest,"analytics":analytics,"paper_only":True,"real_orders":False});return
   if path=="/api/advanced":
    with LOCK: data=json.loads(json.dumps(CACHE["data"])); perps=json.loads(json.dumps(CACHE["perpetuals"]))
    f=data.get("_forecast",{}); rows=[x for x in perps if x.get("symbol")]

@@ -15,7 +15,18 @@ class DeltaAuthClient:
     DEMO = "https://cdn-ind.testnet.deltaex.org"
 
     def __init__(self, environment: str | None = None, timeout: float = 10.0):
-        env = (environment or os.getenv("DELTA_ENV", "demo")).lower()
+        # Explicit argument wins, then DELTA_ENV. If neither is set, honor the
+        # existing DELTA_API_BASE host instead of silently defaulting to demo.
+        selected = environment or os.getenv("DELTA_ENV")
+        if selected is None:
+            configured_base = os.getenv("DELTA_API_BASE", "").rstrip("/")
+            if configured_base == self.PROD:
+                selected = "prod"
+            elif configured_base == self.DEMO:
+                selected = "demo"
+            else:
+                selected = "demo"
+        env = selected.lower()
         if env not in {"demo", "prod"}:
             raise ValueError("DELTA_ENV must be demo or prod")
         self.environment = env

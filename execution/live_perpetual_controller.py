@@ -7,6 +7,7 @@ existing live-readiness gate. This file never changes those flags itself.
 from __future__ import annotations
 import hashlib
 import json
+import math
 import os
 import time
 from pathlib import Path
@@ -18,6 +19,10 @@ if str(ROOT) not in __import__('sys').path:
 from execution.delta_client_private import DeltaAuthClient
 from execution.delta_executor import DeltaExecutor, LiveExecutionBlocked
 from execution.live_trade_guard import GuardConfig, TradePlan, round_tick, validate
+from risk.production_guard import MarketSnapshot, validate_market
+from exchange.delta_state_adapter import DeltaReadOnlyStateAdapter
+from storage.event_journal import EventJournal
+from execution.authoritative_account_risk import evaluate_authoritative_intent
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / "data" / "live_microstructure_state.json"
@@ -50,7 +55,17 @@ def _append(row: dict):
 def signal(state: dict) -> str | None:
     w5, w30 = state["windows"]["5"], state["windows"]["30"]
     ob, q = state["order_book"], state["quality"]
-    if float(q["fresh_seconds"]) > 2 or int(w5["trades"]) < 4:
+    # Fail closed unless every stream contributing to the signal is fresh.
+    # These are local receive ages, independent of exchange timestamp units.
+    try:
+        ages = [float(q[key]) for key in (
+            "trade_fresh_seconds", "price_fresh_seconds", "book_fresh_seconds"
+        )]
+    except (KeyError, TypeError, ValueError):
+        return None
+    if any(not math.isfinite(age) or age < 0 or age > 2.0 for age in ages):
+        return None
+    if int(w5["trades"]) < 4:
         return None
     long_ok = (w5["delta_pct"] >= .12 and w30["delta_pct"] >= .08 and
                ob["imbalance_5"] >= .12 and state["price"]["5"]["return_pct"] >= .025)
@@ -83,9 +98,20 @@ def active_position(payload) -> bool:
     return False
 
 
-def preflight(risk_distance: float) -> dict:
+def preflight(risk_distance: float, *, state_adapter=None, event_journal=None, now_ms=None) -> dict:
     state = _load_state()
+    # Validate authoritative account freshness before evaluating the strategy signal.
+    adapter = state_adapter or DeltaReadOnlyStateAdapter()
+    account = adapter.account_state()
+    current_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
+    if current_ms - int(account.observed_at_ms) > 5000 or int(account.observed_at_ms) - current_ms > 1000:
+        return {"timestamp": time.time(), "order_submission": "DISABLED", "signal": None,
+                "reason": "STALE_DATA_REJECTION"}
+    if not account.complete:
+        return {"timestamp": time.time(), "order_submission": "DISABLED", "signal": None,
+                "reason": "MISSING_ACCOUNT_FIELDS:" + ",".join(account.missing_fields)}
     side = signal(state)
+    journal = event_journal
     result = {
         "timestamp": time.time(), "symbol": SYMBOL, "product_id": PRODUCT_ID,
         "execution_mode": "LOCKED" if not (_env_bool("BTC_LIVE_EXECUTION") and _env_bool("BTC_LIVE_OPERATOR_APPROVED")) else "ARMED_REQUEST",
@@ -98,7 +124,57 @@ def preflight(risk_distance: float) -> dict:
     if not side:
         result["reason"] = "NO_VALID_SIGNAL"
         return result
-    plan = plan_for(side, state["order_book"]["mid_price"], risk_distance)
+
+    # Independent production safety envelope. Missing/invalid microstructure
+    # fields fail closed rather than being inferred or defaulted.
+    try:
+        mid = float(state["order_book"]["mid_price"])
+        spread = float(state["order_book"]["spread"])
+        quality = state["quality"]
+        age = max(float(quality[key]) for key in (
+            "trade_fresh_seconds", "price_fresh_seconds", "book_fresh_seconds"
+        ))
+        if not all(math.isfinite(float(quality[key])) and float(quality[key]) >= 0 for key in (
+            "trade_fresh_seconds", "price_fresh_seconds", "book_fresh_seconds"
+        )):
+            raise ValueError("invalid stream freshness")
+        slippage = float(state["execution"]["estimated_slippage_bps"])
+    except (KeyError, TypeError, ValueError):
+        result["reason"] = "PRODUCTION_SAFETY_INPUT_MISSING"
+        return result
+    market_ok, market_reason = validate_market(
+        MarketSnapshot(age_seconds=age, spread_bps=(spread / mid * 10000.0),
+                        estimated_slippage_bps=slippage))
+    if not market_ok:
+        result["reason"] = market_reason
+        return result
+
+    proposed_btc = (1 if side == "LONG" else -1) * CONTRACTS * 0.001
+    owned_journal = journal is None
+    if owned_journal:
+        journal = EventJournal(ROOT / "data" / "processed" / "authoritative_risk_journal.sqlite3")
+    try:
+        authoritative = evaluate_authoritative_intent(
+            adapter=adapter, journal=journal, symbol=SYMBOL, mark_price=mid,
+            proposed_signed_quantity_btc=proposed_btc, now_ms=now_ms,
+            market_data_age_seconds=age, kill_switch=KILL.exists())
+    finally:
+        if owned_journal:
+            journal.close()
+    result["authoritative_risk"] = authoritative.to_dict()
+    if authoritative.verdict == "SCALED":
+        # Do not route a scaled BTC quantity through a fixed-contract order API.
+        # Contract conversion and exchange lot sizing must be verified first.
+        result["reason"] = "SCALED_QUANTITY_MAPPING_UNSUPPORTED"
+        return result
+    # This controller routes entry orders only. A REDUCE_ONLY verdict must not
+    # be sent through its non-reduce-only bracket path; a dedicated exit adapter
+    # is required before any exit-only action can be executed.
+    if authoritative.verdict != "APPROVED":
+        result["reason"] = authoritative.reason if authoritative.verdict != "REDUCE_ONLY" else "EXIT_ONLY_ROUTE_UNAVAILABLE"
+        return result
+
+    plan = plan_for(side, mid, risk_distance)
     profile = json.loads(PROFILE.read_text())
     ok, detail = validate(plan, GuardConfig(
         balance_usd=float(profile["balance_usd"]), max_contracts=1,

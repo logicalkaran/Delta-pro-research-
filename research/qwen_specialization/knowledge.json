@@ -1,0 +1,13 @@
+{
+  "schema": "qwen-btc-research-knowledge-v1",
+  "scope": "research-only; immutable evidence summaries, not trading instructions",
+  "entries": [
+    {"id":"fact-predictive-test","kind":"validated_fact","claim":"The chronological 70/30 microstructure predictive test reported NO_STABLE_EDGE: 40,992 rows, 28,694 train and 12,298 test; no candidate met stability criteria.","source":"data/processed/microstructure_predictive_test_v1.json","limits":"Threshold candidates selected in train, tested chronologically; does not prove no future signal exists."},
+    {"id":"fact-forecast-calibration","kind":"validated_fact","claim":"The causal forecast calibration artifact reports 30,046 scored samples, mean actual net return -11.81 bps, correlation -0.016, and positive rate 2.97% across its scored population.","source":"data/processed/causal_forecast_calibration_v2.json","limits":"Population and assumed costs belong to that artifact; do not generalize to all regimes or horizons."},
+    {"id":"fact-failure-attribution","kind":"validated_fact","claim":"The historical microstructure strategy attribution reports 199 trades and mean net -7.55 bps; all 199 observations are LOW_VOLATILITY, so other regimes are unobserved.","source":"data/processed/failure_attribution_v1.json","limits":"Historical strategy outcome, not a forecast of current conditions."},
+    {"id":"hypothesis-flow","kind":"hypothesis","claim":"Agreement between near-term price movement, book imbalance, and trade delta may be informative conditionally.","evidence":"Existing feature fields permit testing this idea.","status":"unconfirmed; require chronological holdout, calibration, regime slices, and realistic costs."},
+    {"id":"negative-example-direction","kind":"failure_example","claim":"Do not equate positive order-book imbalance or trade delta with a reliable upward forecast.","evidence":"The predictive test found near-zero unconditional feature correlations and no stable candidates.","lesson":"Report a weak or abstaining view unless calibrated conditional evidence supports it."},
+    {"id":"negative-example-costs","kind":"failure_example","claim":"A positive gross future move is not evidence of positive net expectancy.","evidence":"Existing research artifacts show negative net outcomes after their specified costs.","lesson":"Keep gross labels distinct from net outcomes; identify cost assumptions and uncertainty."},
+    {"id":"negative-example-regime","kind":"failure_example","claim":"Do not claim a strategy is regime robust from a single-regime sample.","evidence":"Failure attribution contains only LOW_VOLATILITY observations.","lesson":"Mark unobserved regimes as unknown and abstain from extrapolation."}
+  ]
+}

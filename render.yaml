@@ -1,0 +1,23 @@
+# Render Blueprint for a READ-ONLY market-data collector.
+# Free plan is a best-effort demo only: no persistent disk and no continuous-uptime guarantee.
+services:
+  - type: web
+    name: delta-btcusd-readonly-collector
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.render-collector
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: MAX_STALE_SECONDS
+        value: "20"
+      - key: HEALTH_CHECK_INTERVAL_SECONDS
+        value: "5"
+      - key: ALERT_COOLDOWN_SECONDS
+        value: "300"
+      # Optional: set in Render Dashboard as a secret. Use a webhook provider that accepts JSON POST.
+      - key: ALERT_WEBHOOK_URL
+        sync: false

@@ -67,6 +67,14 @@ def state():
     live = _json(ROOT / "data/live_market_state.json", {})
     candles = _json(ROOT / "data/live_candles.json", [])
     microstructure = _json(ROOT / "data/live_microstructure_state.json", {})
+    predictive_levels = _json(ROOT / "data/processed/predictive_levels_live.json", {})
+    paper_v3 = _json(ROOT / "data/processed/live_execution_paper_v3_summary.json", {})
+    live_gate = None
+    try:
+        from live_readiness_gate import evaluate
+        live_gate = evaluate()
+    except Exception:
+        live_gate = {"locked": True, "eligible": False, "live_execution": False}
     return {
         "project": "btc_fisher_trader",
         "read_only": True,
@@ -75,6 +83,9 @@ def state():
         "live_market": live,
         "candles": candles[-300:],
         "microstructure": microstructure,
+        "predictive_levels": predictive_levels,
+        "paper_v3": paper_v3,
+        "live_gate": live_gate,
         "paper": {
             "position": None if p.position is None else {
                 "side": p.position.side,

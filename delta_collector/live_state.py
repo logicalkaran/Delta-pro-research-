@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -47,9 +48,19 @@ def update(message):
         except (TypeError, ValueError, KeyError):
             pass
 
-    tmp = STATE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
-    os.replace(tmp, STATE)
+    payload = json.dumps(data, separators=(",", ":"))
+    fd, tmp_name = tempfile.mkstemp(prefix=".live_market_state.", dir=str(STATE.parent), text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, STATE)
+    finally:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
 
     # Read-only analytics sidecar. It has no execution capability.
     try:

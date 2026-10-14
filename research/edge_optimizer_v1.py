@@ -2,12 +2,15 @@
 Replays the existing raw public feed. Never submits orders.
 Conservative cost: 0.05% taker each side + 18% GST on trading fees.
 """
-import json, os, math
+import argparse, json, os, math
 from collections import deque
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-RAW=ROOT/"data/raw/delta_btc_raw.jsonl"
 OUT=ROOT/"data/processed/edge_optimizer_v1.json"
+try:
+    from research.raw_archive_reader_v1 import DEFAULT_ARCHIVE_DIR, DEFAULT_LEGACY_PATH, iter_raw_records
+except ModuleNotFoundError:  # direct script execution from research/
+    from raw_archive_reader_v1 import DEFAULT_ARCHIVE_DIR, DEFAULT_LEGACY_PATH, iter_raw_records
 COST_BPS=11.8
 
 def f(x,d=0.0):
@@ -25,15 +28,16 @@ def classify(m,l1):
     if r=="t":return "buy",s,p
     return None
 
-def run(max_events=2000000):
+def run(max_events=2000000, session_id=None, archive_dir=DEFAULT_ARCHIVE_DIR, legacy_path=DEFAULT_LEGACY_PATH):
     q5=deque(); q30=deque(); pts=deque(); l1={}; bids={}; asks={}
     b5=s5=b30=s30=0.0; samples=[]; n=0
-    with RAW.open() as fh:
-        for line in fh:
+    for record in iter_raw_records(session_id=session_id, data_dir=archive_dir, legacy_path=legacy_path):
             if n>=max_events: break
             n+=1
-            try:m=json.loads(line); m=m.get("message",m)
-            except:continue
+            try:
+                m=record.get("message",record)
+                if not isinstance(m,dict): continue
+            except Exception: continue
             typ=m.get("type")
             ts=int(f(m.get("ts") or m.get("t")))
             if not ts: continue
@@ -110,4 +114,13 @@ def run(max_events=2000000):
     OUT.write_text(json.dumps(out,indent=2))
     print(json.dumps(out,indent=2))
 
-if __name__=="__main__": run()
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--max-events",type=int,default=2000000)
+    parser.add_argument("--session-id",default=None,help="explicit immutable gzip session ID")
+    parser.add_argument("--archive-dir",type=Path,default=DEFAULT_ARCHIVE_DIR)
+    parser.add_argument("--legacy-path",type=Path,default=DEFAULT_LEGACY_PATH)
+    args=parser.parse_args()
+    run(max_events=args.max_events,session_id=args.session_id,archive_dir=args.archive_dir,legacy_path=args.legacy_path)
+
+if __name__=="__main__": main()

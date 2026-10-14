@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "live_microstructure_state.json"
 
-WINDOWS = (5, 30, 60)
+WINDOWS = (1, 5, 30, 60)
 MAX_TRADES = 5000
 MAX_PRICES = 3000
 
@@ -24,6 +24,10 @@ _prices = deque(maxlen=MAX_PRICES)
 _book = {"bids": {}, "asks": {}, "ts": None}
 _last_l1 = {}
 _last_update = 0.0
+_last_trade_update = 0.0
+_last_price_update = 0.0
+_last_l1_update = 0.0
+_last_l2_update = 0.0
 
 
 def _num(value, default=0.0):
@@ -72,6 +76,7 @@ def _classify_trade(message):
 
 
 def _snapshot_l2(message):
+    global _last_l2_update
     bids = {}
     asks = {}
     for price, size in message.get("b", []):
@@ -85,6 +90,7 @@ def _snapshot_l2(message):
     _book["bids"] = bids
     _book["asks"] = asks
     _book["ts"] = _event_ts(message)
+    _last_l2_update = time.time()
 
 
 def _window_stats(now_us, seconds):
@@ -151,6 +157,9 @@ def _book_stats():
         "imbalance_10": round(_imbalance(*d10), 6),
         "bid_levels": len(bids),
         "ask_levels": len(asks),
+        # Research telemetry only: top five price/size levels, best first.
+        "bids_l5": [[float(price), float(size)] for price, size in bids[:5]],
+        "asks_l5": [[float(price), float(size)] for price, size in asks[:5]],
     }
 
 
@@ -200,7 +209,16 @@ def _state():
         "quality": {
             "trade_samples": len(_trades),
             "book_samples": 1 if _book["ts"] else 0,
+            # Per-stream receive ages avoid one fresh channel masking another stale one.
             "fresh_seconds": round(max(0.0, time.time() - _last_update), 3) if _last_update else None,
+            "trade_fresh_seconds": round(max(0.0, time.time() - _last_trade_update), 3) if _last_trade_update else None,
+            "price_fresh_seconds": round(max(0.0, time.time() - _last_price_update), 3) if _last_price_update else None,
+            "l1_fresh_seconds": round(max(0.0, time.time() - _last_l1_update), 3) if _last_l1_update else None,
+            "l2_fresh_seconds": round(max(0.0, time.time() - _last_l2_update), 3) if _last_l2_update else None,
+            "book_fresh_seconds": round(
+                max(0.0, time.time() - (_last_l2_update if (_book["bids"] or _book["asks"]) else _last_l1_update)),
+                3,
+            ) if (_last_l2_update if (_book["bids"] or _book["asks"]) else _last_l1_update) else None,
         },
     }
     return state
@@ -214,7 +232,7 @@ def _write(state):
 
 
 def update(message):
-    global _last_l1, _last_update
+    global _last_l1, _last_update, _last_trade_update, _last_price_update, _last_l1_update
     if not isinstance(message, dict):
         return
     typ = message.get("type")
@@ -225,6 +243,7 @@ def update(message):
             "ap": message.get("ap"),
             "as": message.get("as"),
         }
+        _last_l1_update = time.time()
     elif typ == "ob_l2":
         _snapshot_l2(message)
     elif typ == "trades":
@@ -242,6 +261,8 @@ def update(message):
                 "delta": sign * size,
             })
             _prices.append({"ts": ts, "price": price})
+            _last_trade_update = time.time()
+            _last_price_update = _last_trade_update
     else:
         return
     _last_update = time.time()
@@ -249,7 +270,7 @@ def update(message):
 
 
 def reset():
-    global _last_l1, _last_update
+    global _last_l1, _last_update, _last_trade_update, _last_price_update, _last_l1_update, _last_l2_update
     _trades.clear()
     _prices.clear()
     _book["bids"].clear()
@@ -257,5 +278,9 @@ def reset():
     _book["ts"] = None
     _last_l1 = {}
     _last_update = 0.0
+    _last_trade_update = 0.0
+    _last_price_update = 0.0
+    _last_l1_update = 0.0
+    _last_l2_update = 0.0
     if OUT.exists():
         OUT.unlink()

@@ -1,0 +1,121 @@
+{
+  "experiment": "order_block_v1",
+  "mode": "research_only_local_paper_simulation",
+  "live_execution_enabled": false,
+  "symbol": "BTCUSD",
+  "timeframe": "15m",
+  "direction": "both",
+  "source": "research/order_block_v1/btcusd_15m.csv",
+  "requested_history_days": 180,
+  "candles": 17280,
+  "first_utc": "2026-04-13T23:15:00+00:00",
+  "last_utc": "2026-10-10T23:00:00+00:00",
+  "fee_bps_per_side_assumption": 5.0,
+  "slippage_bps_per_side_assumption": 2.0,
+  "risk_reward": 2.0,
+  "max_hold_bars": 48,
+  "walk_forward_split": "isolated chronological first 70% / final 30%; zones/positions reset at split",
+  "data_gap_count": 0,
+  "train": {
+    "trades": 307,
+    "win_rate": 0.30618892508143325,
+    "gross_expectancy_r": -0.07239885907662054,
+    "gross_profit_factor": 0.893142068574411,
+    "net_expectancy_r": -0.8661664160900489,
+    "net_profit_factor": 0.3112767124666757,
+    "avg_cost_r": 0.7937675570134284,
+    "avg_risk_bps": 31.288250064604945,
+    "net_total_r": -265.913089739645,
+    "max_drawdown_r": 267.2261508562621,
+    "long_trades": 149,
+    "short_trades": 158
+  },
+  "holdout": {
+    "trades": 131,
+    "win_rate": 0.3816793893129771,
+    "gross_expectancy_r": 0.17791511632663481,
+    "gross_profit_factor": 1.3002667614634504,
+    "net_expectancy_r": -0.5789072245028689,
+    "net_profit_factor": 0.44512188258761015,
+    "avg_cost_r": 0.7568223408295037,
+    "avg_risk_bps": 29.25857966855801,
+    "net_total_r": -75.83684640987583,
+    "max_drawdown_r": 78.0127974823406,
+    "long_trades": 69,
+    "short_trades": 62
+  },
+  "all_sample_descriptive": {
+    "trades": 438,
+    "win_rate": 0.3287671232876712,
+    "gross_expectancy_r": 0.0024667363065448713,
+    "gross_profit_factor": 1.0037827473829788,
+    "net_expectancy_r": -0.7802509957751618,
+    "net_profit_factor": 0.3462692810180342,
+    "avg_cost_r": 0.7827177320817066,
+    "avg_risk_bps": 30.681202526061224,
+    "net_total_r": -341.74993614952086,
+    "max_drawdown_r": 345.23894833860265,
+    "long_trades": 218,
+    "short_trades": 220
+  },
+  "cost_sensitivity": [
+    {
+      "fee_bps_per_side": 2.0,
+      "slippage_bps_per_side": 1.0,
+      "all_sample": {
+        "trades": 438,
+        "win_rate": 0.3447488584474886,
+        "gross_expectancy_r": 0.0024667363065448713,
+        "gross_profit_factor": 1.0037827473829788,
+        "net_expectancy_r": -0.3329837202999008,
+        "net_profit_factor": 0.6214772963329376,
+        "avg_cost_r": 0.3354504566064456,
+        "avg_risk_bps": 30.681202526061224,
+        "net_total_r": -145.84686949135656,
+        "max_drawdown_r": 156.23070771316276,
+        "long_trades": 218,
+        "short_trades": 220
+      }
+    },
+    {
+      "fee_bps_per_side": 5.0,
+      "slippage_bps_per_side": 2.0,
+      "all_sample": {
+        "trades": 438,
+        "win_rate": 0.3287671232876712,
+        "gross_expectancy_r": 0.0024667363065448713,
+        "gross_profit_factor": 1.0037827473829788,
+        "net_expectancy_r": -0.7802509957751618,
+        "net_profit_factor": 0.3462692810180342,
+        "avg_cost_r": 0.7827177320817066,
+        "avg_risk_bps": 30.681202526061224,
+        "net_total_r": -341.74993614952086,
+        "max_drawdown_r": 345.23894833860265,
+        "long_trades": 218,
+        "short_trades": 220
+      }
+    },
+    {
+      "fee_bps_per_side": 8.0,
+      "slippage_bps_per_side": 4.0,
+      "all_sample": {
+        "trades": 438,
+        "win_rate": 0.2762557077625571,
+        "gross_expectancy_r": 0.0024667363065448713,
+        "gross_profit_factor": 1.0037827473829788,
+        "net_expectancy_r": -1.3393350901192378,
+        "net_profit_factor": 0.1752381085426896,
+        "avg_cost_r": 1.3418018264257825,
+        "avg_risk_bps": 30.681202526061224,
+        "net_total_r": -586.6287694722262,
+        "max_drawdown_r": 587.4511599578557,
+        "long_trades": 218,
+        "short_trades": 220
+      }
+    }
+  ],
+  "validation_warnings": [
+    "Holdout net expectancy is non-positive; do not promote this rule set.",
+    "Modeled transaction costs exceed holdout gross expectancy; the current edge does not cover costs."
+  ]
+}

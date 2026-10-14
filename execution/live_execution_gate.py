@@ -29,6 +29,16 @@ def check() -> dict:
 
     if policy.get("status") != "PROMOTED":
         reasons.append("PROMOTION_POLICY_BLOCKED")
+
+    # The promotion policy is not sufficient by itself. Require the independent
+    # machine-readable readiness gate as well, so changing the policy/arming
+    # flags cannot bypass strategy, walk-forward, cost, paper-stability,
+    # risk-limit, adapter, or operator checks.
+    from live_readiness_gate import evaluate
+    readiness = evaluate()
+    if not readiness["eligible"]:
+        reasons.append("LIVE_READINESS_GATE_BLOCKED")
+
     if not _true("BTC_LIVE_EXECUTION"):
         reasons.append("BTC_LIVE_EXECUTION_NOT_ENABLED")
     if not _true("BTC_LIVE_OPERATOR_APPROVED"):

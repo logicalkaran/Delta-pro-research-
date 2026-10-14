@@ -1,0 +1,135 @@
+{
+  "experiment": "step3_risk_width_filter",
+  "research_only": true,
+  "live_execution_enabled": false,
+  "source_sha256": "2d95db5bb3ce3161ededf827be5fad309f7d0c6f51b191f33832add2f5a3c5ab",
+  "candles": 17280,
+  "split_index": 12096,
+  "threshold_grid_bps": [
+    0,
+    40,
+    50,
+    60,
+    75
+  ],
+  "selection_rule": "highest training net expectancy among candidates with at least 25 training trades",
+  "training_screen": [
+    {
+      "threshold_bps": 0,
+      "metrics": {
+        "trades": 307,
+        "win_rate": 0.30618892508143325,
+        "gross_expectancy_r": -0.07239885907662054,
+        "gross_profit_factor": 0.893142068574411,
+        "net_expectancy_r": -0.8661664160900489,
+        "net_profit_factor": 0.3112767124666757,
+        "avg_cost_r": 0.7937675570134284,
+        "avg_risk_bps": 31.288250064604945,
+        "net_total_r": -265.913089739645,
+        "max_drawdown_r": 267.2261508562621,
+        "long_trades": 149,
+        "short_trades": 158
+      }
+    },
+    {
+      "threshold_bps": 40,
+      "metrics": {
+        "trades": 106,
+        "win_rate": 0.2830188679245283,
+        "gross_expectancy_r": -0.16274456816609306,
+        "gross_profit_factor": 0.7579875194187663,
+        "net_expectancy_r": -0.4177560040594653,
+        "net_profit_factor": 0.5113905461804796,
+        "avg_cost_r": 0.25501143589337216,
+        "avg_risk_bps": 61.18855992918055,
+        "net_total_r": -44.28213643030332,
+        "max_drawdown_r": 44.282136430303304,
+        "long_trades": 60,
+        "short_trades": 46
+      }
+    },
+    {
+      "threshold_bps": 50,
+      "metrics": {
+        "trades": 70,
+        "win_rate": 0.32857142857142857,
+        "gross_expectancy_r": -0.03456627745229177,
+        "gross_profit_factor": 0.9427725996652878,
+        "net_expectancy_r": -0.24345507514446635,
+        "net_profit_factor": 0.6718778681618427,
+        "avg_cost_r": 0.20888879769217458,
+        "avg_risk_bps": 72.52861388009701,
+        "net_total_r": -17.041855260112644,
+        "max_drawdown_r": 19.448358894550164,
+        "long_trades": 32,
+        "short_trades": 38
+      }
+    },
+    {
+      "threshold_bps": 60,
+      "metrics": {
+        "trades": 56,
+        "win_rate": 0.4107142857142857,
+        "gross_expectancy_r": 0.1442016828276629,
+        "gross_profit_factor": 1.2757848807131296,
+        "net_expectancy_r": -0.039623319275142434,
+        "net_profit_factor": 0.9368830974226984,
+        "avg_cost_r": 0.18382500210280533,
+        "avg_risk_bps": 81.04084358912566,
+        "net_total_r": -2.218905879407976,
+        "max_drawdown_r": 6.822486734095434,
+        "long_trades": 25,
+        "short_trades": 31
+      }
+    },
+    {
+      "threshold_bps": 75,
+      "metrics": {
+        "trades": 28,
+        "win_rate": 0.39285714285714285,
+        "gross_expectancy_r": 0.10367099754674536,
+        "gross_profit_factor": 1.203260314658964,
+        "net_expectancy_r": -0.039916437353084866,
+        "net_profit_factor": 0.9324438603980282,
+        "avg_cost_r": 0.14358743489983022,
+        "avg_risk_bps": 101.82354706337988,
+        "net_total_r": -1.1176602458863762,
+        "max_drawdown_r": 4.716433711024967,
+        "long_trades": 14,
+        "short_trades": 14
+      }
+    }
+  ],
+  "selected_threshold_bps": 60,
+  "selected_training_metrics": {
+    "trades": 56,
+    "win_rate": 0.4107142857142857,
+    "gross_expectancy_r": 0.1442016828276629,
+    "gross_profit_factor": 1.2757848807131296,
+    "net_expectancy_r": -0.039623319275142434,
+    "net_profit_factor": 0.9368830974226984,
+    "avg_cost_r": 0.18382500210280533,
+    "avg_risk_bps": 81.04084358912566,
+    "net_total_r": -2.218905879407976,
+    "max_drawdown_r": 6.822486734095434,
+    "long_trades": 25,
+    "short_trades": 31
+  },
+  "untouched_holdout_metrics": {
+    "trades": 24,
+    "win_rate": 0.5,
+    "gross_expectancy_r": 0.3518281408398864,
+    "gross_profit_factor": 1.8291842947543884,
+    "net_expectancy_r": 0.17130176460280477,
+    "net_profit_factor": 1.3363612801958367,
+    "avg_cost_r": 0.18052637623708165,
+    "avg_risk_bps": 86.87851192160231,
+    "net_total_r": 4.111242350467315,
+    "max_drawdown_r": 2.9961349109147117,
+    "long_trades": 10,
+    "short_trades": 14
+  },
+  "holdout_warnings": [
+    "Fewer than 30 holdout trades; inference is sparse."
+  ]
+}
